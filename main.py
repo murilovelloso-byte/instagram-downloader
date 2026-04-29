@@ -25,8 +25,14 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
 APP_URL = os.getenv("APP_URL", "https://instagram-downloader-wgvm.onrender.com")
 
-INSTAGRAM_PATTERN = re.compile(
-    r"https?://(www\.)?instagram\.com/(p|reel|tv|stories)/[\w\-]+/?",
+SUPPORTED_URL_PATTERN = re.compile(
+    r"https?://("
+    r"(www\.)?instagram\.com/(p|reel|tv|stories)/[\w\-]+/?"
+    r"|"
+    r"(www\.)?(youtube\.com/(watch|shorts)|youtu\.be)/[\w\-\?=&]+"
+    r"|"
+    r"(www\.|vm\.)?tiktok\.com/[\w\-\?=&@/]+"
+    r")",
     re.IGNORECASE,
 )
 
@@ -82,8 +88,8 @@ def send_email(to: str, subject: str, html_body: str):
 # --- Helpers ---
 
 
-def is_valid_instagram_url(url: str) -> bool:
-    return bool(INSTAGRAM_PATTERN.search(url))
+def is_valid_url(url: str) -> bool:
+    return bool(SUPPORTED_URL_PATTERN.search(url))
 
 
 def extract_video_info(instagram_url: str) -> dict:
@@ -356,7 +362,7 @@ async def confirmar(email: str = Query(...), codigo: str = Query(...)):
 
 @app.get("/download")
 async def download(
-    url: str = Query(..., description="URL do post do Instagram"),
+    url: str = Query(..., description="URL do vídeo (Instagram, YouTube ou TikTok)"),
     chave: str = Query(..., description="Chave de ativação"),
 ):
     conn = get_db()
@@ -371,10 +377,10 @@ async def download(
     if not row:
         raise HTTPException(status_code=401, detail="Chave inválida ou acesso revogado.")
 
-    if not is_valid_instagram_url(url):
+    if not is_valid_url(url):
         raise HTTPException(
             status_code=400,
-            detail="URL inválida. Envie apenas links do Instagram (post, reel ou tv).",
+            detail="URL inválida. Envie links do Instagram, YouTube ou TikTok.",
         )
 
     try:
@@ -397,7 +403,7 @@ async def download(
     return StreamingResponse(
         stream(),
         media_type="video/mp4",
-        headers={"Content-Disposition": f'attachment; filename="instagram_video.{ext}"'},
+        headers={"Content-Disposition": f'attachment; filename="video.{ext}"'},
     )
 
 
