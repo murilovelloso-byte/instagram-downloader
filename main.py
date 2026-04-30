@@ -6,6 +6,7 @@ import smtplib
 from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from urllib.parse import urlparse, unquote
 
 import httpx
 import psycopg2
@@ -41,7 +42,15 @@ SUPPORTED_URL_PATTERN = re.compile(
 
 
 def get_db():
-    conn = psycopg2.connect(DATABASE_URL)
+    r = urlparse(DATABASE_URL)
+    conn = psycopg2.connect(
+        host=r.hostname,
+        port=r.port or 5432,
+        user=unquote(r.username or ""),
+        password=unquote(r.password or ""),
+        dbname=(r.path or "/postgres").lstrip("/"),
+        sslmode="require",
+    )
     return conn
 
 
