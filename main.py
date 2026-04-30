@@ -29,6 +29,8 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
 APP_URL = os.getenv("APP_URL", "https://instagram-downloader-wgvm.onrender.com")
 
+KIWIFY_TOKEN = os.getenv("KIWIFY_TOKEN", "")
+
 SUPPORTED_URL_PATTERN = re.compile(
     r"https?://("
     r"(www\.)?instagram\.com/(p|reel|tv|stories)/[\w\-]+/?"
@@ -477,6 +479,62 @@ async def list_compradores(x_admin_key: str = Header(None)):
         "SELECT email, ativo, criado_em FROM compradores ORDER BY criado_em DESC"
     )
     return [dict(r) for r in rows]
+
+
+# --- Webhook Kiwify ---
+
+
+@app.post("/webhook/kiwify")
+async def webhook_kiwify(payload: dict):
+    token = payload.get("token", "")
+    if KIWIFY_TOKEN and token != KIWIFY_TOKEN:
+        raise HTTPException(status_code=403, detail="Token inválido.")
+
+    event = payload.get("event", "") or payload.get("order_status", "")
+    status = payload.get("order_status", "")
+
+    if event not in ("order_approved",) and status != "paid":
+        return {"ok": True, "ignored": True}
+
+    customer = payload.get("Customer") or payload.get("customer") or {}
+    email = (customer.get("email") or "").lower().strip()
+    name = customer.get("name") or ""
+
+    if not email:
+        raise HTTPException(status_code=400, detail="E-mail do comprador não encontrado.")
+
+    db_execute(
+        """INSERT INTO compradores (email, ativo) VALUES (%s, 1)
+           ON CONFLICT (email) DO UPDATE SET ativo = 1""",
+        (email,),
+    )
+
+    codigo = str(random.randint(100000, 999999))
+    expira_em = datetime.now(timezone.utc) + timedelta(minutes=30)
+    db_execute(
+        """INSERT INTO temp_codigos (email, codigo, expira_em)
+           VALUES (%s, %s, %s)
+           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, expira_em = EXCLUDED.expira_em""",
+        (email, codigo, expira_em),
+    )
+
+    link = f"{APP_URL}/confirmar?email={email}&codigo={codigo}"
+    html_body = f"""
+    <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
+      <h2 style="color:#1d1d1f;margin-bottom:8px">Seu código de ativação</h2>
+      <p style="color:#6e6e73;margin-bottom:24px">Obrigado pela compra! Use este código para ativar o atalho <strong>Baixar Agora</strong></p>
+      <div style="background:#f5f5f7;border-radius:12px;padding:20px;font-size:40px;font-weight:700;color:#5e17eb;letter-spacing:10px">{codigo}</div>
+      <p style="margin:24px 0 8px;color:#6e6e73">Ou clique no botão abaixo para ativar diretamente:</p>
+      <a href="{link}" style="display:inline-block;padding:14px 28px;background:#5e17eb;color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px">Ativar meu atalho</a>
+      <p style="color:#aeaeb2;font-size:13px;margin-top:24px">Este código expira em 30 minutos.</p>
+    </div>
+    """
+    try:
+        send_email(email, f"Código de ativação Baixar Agora: {codigo}", html_body)
+    except Exception:
+        pass
+
+    return {"ok": True, "email": email}
 
 
 # --- Health ---
