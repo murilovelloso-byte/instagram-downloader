@@ -1,5 +1,7 @@
 import re
 import os
+import shutil
+import tempfile
 import random
 import secrets
 import smtplib
@@ -132,20 +134,21 @@ def is_valid_url(url: str) -> bool:
     return bool(SUPPORTED_URL_PATTERN.search(url))
 
 
-def extract_video_info(instagram_url: str) -> dict:
+def download_video(url: str) -> tuple[str, str, str]:
+    """Download video to temp dir. Returns (tmpdir, filepath, ext)."""
+    tmpdir = tempfile.mkdtemp()
     ydl_opts = {
         "format": "best[ext=mp4]/best",
         "quiet": True,
         "no_warnings": True,
+        "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
         "extractor_args": {"instagram": {"include_feed_data": ["0"]}},
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(instagram_url, download=False)
-        return {
-            "url": info["url"],
-            "ext": info.get("ext", "mp4"),
-            "http_headers": info.get("http_headers", {}),
-        }
+        info = ydl.extract_info(url, download=True)
+        ext = info.get("ext", "mp4")
+    filepath = os.path.join(tmpdir, f"video.{ext}")
+    return tmpdir, filepath, ext
 
 
 def require_admin(x_admin_key: str = Header(None)):
@@ -407,29 +410,37 @@ async def download(
             detail="URL inválida. Envie links do Instagram, YouTube ou TikTok.",
         )
 
+    tmpdir = None
     try:
-        info = extract_video_info(url)
+        tmpdir, filepath, ext = download_video(url)
+        if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
+            raise HTTPException(status_code=422, detail="Não foi possível baixar o vídeo.")
+
+        def stream():
+            try:
+                with open(filepath, "rb") as f:
+                    while chunk := f.read(65536):
+                        yield chunk
+            finally:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+
+        return StreamingResponse(
+            stream(),
+            media_type="video/mp4",
+            headers={"Content-Disposition": f'attachment; filename="video.{ext}"'},
+        )
     except yt_dlp.utils.DownloadError as e:
+        if tmpdir:
+            shutil.rmtree(tmpdir, ignore_errors=True)
         raise HTTPException(status_code=422, detail=f"Não foi possível extrair o vídeo: {e}")
+    except HTTPException:
+        if tmpdir:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        raise
     except Exception as e:
+        if tmpdir:
+            shutil.rmtree(tmpdir, ignore_errors=True)
         raise HTTPException(status_code=500, detail=f"Erro interno: {e}")
-
-    video_url = info["url"]
-    ext = info["ext"]
-    http_headers = info.get("http_headers", {})
-
-    async def stream():
-        async with httpx.AsyncClient(timeout=60, follow_redirects=True, headers=http_headers) as client:
-            async with client.stream("GET", video_url) as response:
-                response.raise_for_status()
-                async for chunk in response.aiter_bytes(chunk_size=8192):
-                    yield chunk
-
-    return StreamingResponse(
-        stream(),
-        media_type="video/mp4",
-        headers={"Content-Disposition": f'attachment; filename="video.{ext}"'},
-    )
 
 
 # --- Admin endpoints ---
