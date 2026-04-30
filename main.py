@@ -3,12 +3,13 @@ import os
 import random
 import secrets
 import smtplib
-import sqlite3
 from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import httpx
+import psycopg2
+import psycopg2.extras
 import yt_dlp
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -17,7 +18,7 @@ from pydantic import BaseModel
 app = FastAPI(title="Baixar Agora API")
 
 # --- Config ---
-DB_PATH = os.getenv("DB_PATH", "baixar_agora.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 ADMIN_KEY = os.getenv("ADMIN_KEY", "")
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
@@ -40,30 +41,60 @@ SUPPORTED_URL_PATTERN = re.compile(
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
+
+
+def db_fetchone(query: str, params: tuple = ()):
+    conn = get_db()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(query, params)
+        row = cur.fetchone()
+    conn.close()
+    return row
+
+
+def db_fetchall(query: str, params: tuple = ()):
+    conn = get_db()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(query, params)
+        rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def db_execute(query: str, params: tuple = ()):
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute(query, params)
+    conn.commit()
+    conn.close()
 
 
 def init_db():
     conn = get_db()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS compradores (
-            email TEXT PRIMARY KEY,
-            ativo INTEGER DEFAULT 1,
-            criado_em TEXT DEFAULT (datetime('now'))
-        );
-        CREATE TABLE IF NOT EXISTS chaves (
-            email TEXT PRIMARY KEY,
-            chave TEXT UNIQUE NOT NULL,
-            criado_em TEXT DEFAULT (datetime('now'))
-        );
-        CREATE TABLE IF NOT EXISTS temp_codigos (
-            email TEXT PRIMARY KEY,
-            codigo TEXT NOT NULL,
-            expira_em TEXT NOT NULL
-        );
-    """)
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS compradores (
+                email TEXT PRIMARY KEY,
+                ativo INTEGER DEFAULT 1,
+                criado_em TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS chaves (
+                email TEXT PRIMARY KEY,
+                chave TEXT UNIQUE NOT NULL,
+                criado_em TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS temp_codigos (
+                email TEXT PRIMARY KEY,
+                codigo TEXT NOT NULL,
+                expira_em TIMESTAMPTZ NOT NULL
+            )
+        """)
     conn.commit()
     conn.close()
 
@@ -270,12 +301,8 @@ class AtivarRequest(BaseModel):
 @app.post("/ativar")
 async def post_ativar(body: AtivarRequest):
     email = body.email.lower().strip()
-    conn = get_db()
 
-    comprador = conn.execute(
-        "SELECT ativo FROM compradores WHERE email = ?", (email,)
-    ).fetchone()
-    conn.close()
+    comprador = db_fetchone("SELECT ativo FROM compradores WHERE email = %s", (email,))
 
     if not comprador:
         raise HTTPException(
@@ -289,15 +316,13 @@ async def post_ativar(body: AtivarRequest):
         )
 
     codigo = str(random.randint(100000, 999999))
-    expira_em = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()
+    expira_em = datetime.now(timezone.utc) + timedelta(minutes=30)
 
-    conn = get_db()
-    conn.execute(
-        "INSERT OR REPLACE INTO temp_codigos (email, codigo, expira_em) VALUES (?, ?, ?)",
+    db_execute(
+        """INSERT INTO temp_codigos (email, codigo, expira_em) VALUES (%s, %s, %s)
+           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, expira_em = EXCLUDED.expira_em""",
         (email, codigo, expira_em),
     )
-    conn.commit()
-    conn.close()
 
     link = f"{APP_URL}/confirmar?email={email}&codigo={codigo}"
     html_body = f"""
@@ -322,37 +347,28 @@ async def post_ativar(body: AtivarRequest):
 @app.get("/confirmar", response_class=HTMLResponse)
 async def confirmar(email: str = Query(...), codigo: str = Query(...)):
     email = email.lower().strip()
-    conn = get_db()
 
-    temp = conn.execute(
-        "SELECT codigo, expira_em FROM temp_codigos WHERE email = ?", (email,)
-    ).fetchone()
+    temp = db_fetchone(
+        "SELECT codigo, expira_em FROM temp_codigos WHERE email = %s", (email,)
+    )
 
     if not temp or temp["codigo"] != codigo:
-        conn.close()
         return HTMLResponse(build_erro_html("Código inválido."), status_code=400)
 
-    if datetime.now(timezone.utc) > datetime.fromisoformat(temp["expira_em"]):
-        conn.close()
+    if datetime.now(timezone.utc) > temp["expira_em"]:
         return HTMLResponse(
             build_erro_html("Código expirado. Solicite um novo código."), status_code=400
         )
 
-    existing = conn.execute(
-        "SELECT chave FROM chaves WHERE email = ?", (email,)
-    ).fetchone()
+    existing = db_fetchone("SELECT chave FROM chaves WHERE email = %s", (email,))
 
     if existing:
         chave = existing["chave"]
     else:
         chave = secrets.token_hex(8)
-        conn.execute(
-            "INSERT INTO chaves (email, chave) VALUES (?, ?)", (email, chave)
-        )
+        db_execute("INSERT INTO chaves (email, chave) VALUES (%s, %s)", (email, chave))
 
-    conn.execute("DELETE FROM temp_codigos WHERE email = ?", (email,))
-    conn.commit()
-    conn.close()
+    db_execute("DELETE FROM temp_codigos WHERE email = %s", (email,))
 
     return HTMLResponse(build_confirmar_html(chave))
 
@@ -365,14 +381,12 @@ async def download(
     url: str = Query(..., description="URL do vídeo (Instagram, YouTube ou TikTok)"),
     chave: str = Query(..., description="Chave de ativação"),
 ):
-    conn = get_db()
-    row = conn.execute(
+    row = db_fetchone(
         """SELECT c.email FROM chaves c
            JOIN compradores cp ON c.email = cp.email
-           WHERE c.chave = ? AND cp.ativo = 1""",
+           WHERE c.chave = %s AND cp.ativo = 1""",
         (chave,),
-    ).fetchone()
-    conn.close()
+    )
 
     if not row:
         raise HTTPException(status_code=401, detail="Chave inválida ou acesso revogado.")
@@ -418,12 +432,11 @@ class CompradorRequest(BaseModel):
 async def add_comprador(body: CompradorRequest, x_admin_key: str = Header(None)):
     require_admin(x_admin_key)
     email = body.email.lower().strip()
-    conn = get_db()
-    conn.execute(
-        "INSERT OR REPLACE INTO compradores (email, ativo) VALUES (?, 1)", (email,)
+    db_execute(
+        """INSERT INTO compradores (email, ativo) VALUES (%s, 1)
+           ON CONFLICT (email) DO UPDATE SET ativo = 1""",
+        (email,),
     )
-    conn.commit()
-    conn.close()
     return {"ok": True, "email": email, "status": "ativo"}
 
 
@@ -431,21 +444,16 @@ async def add_comprador(body: CompradorRequest, x_admin_key: str = Header(None))
 async def revoke_comprador(email: str, x_admin_key: str = Header(None)):
     require_admin(x_admin_key)
     email = email.lower().strip()
-    conn = get_db()
-    conn.execute("UPDATE compradores SET ativo = 0 WHERE email = ?", (email,))
-    conn.commit()
-    conn.close()
+    db_execute("UPDATE compradores SET ativo = 0 WHERE email = %s", (email,))
     return {"ok": True, "email": email, "status": "revogado"}
 
 
 @app.get("/admin/compradores")
 async def list_compradores(x_admin_key: str = Header(None)):
     require_admin(x_admin_key)
-    conn = get_db()
-    rows = conn.execute(
+    rows = db_fetchall(
         "SELECT email, ativo, criado_em FROM compradores ORDER BY criado_em DESC"
-    ).fetchall()
-    conn.close()
+    )
     return [dict(r) for r in rows]
 
 
