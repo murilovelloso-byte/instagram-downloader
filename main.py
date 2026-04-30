@@ -144,6 +144,7 @@ def extract_video_info(instagram_url: str) -> dict:
         return {
             "url": info["url"],
             "ext": info.get("ext", "mp4"),
+            "http_headers": info.get("http_headers", {}),
         }
 
 
@@ -415,9 +416,10 @@ async def download(
 
     video_url = info["url"]
     ext = info["ext"]
+    http_headers = info.get("http_headers", {})
 
     async def stream():
-        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True, headers=http_headers) as client:
             async with client.stream("GET", video_url) as response:
                 response.raise_for_status()
                 async for chunk in response.aiter_bytes(chunk_size=8192):
