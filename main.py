@@ -37,7 +37,7 @@ SUPPORTED_URL_PATTERN = re.compile(
     r"|"
     r"(www\.)?(youtube\.com/(watch|shorts)|youtu\.be)/[\w\-\?=&]+"
     r"|"
-    r"(www\.|vm\.|vt\.)?tiktok\.com/[\w\-\?=&@/]+"
+    r"[\w\-\.]*tiktok\.com/[\w\-\?=&@/\.\%]+"
     r")",
     re.IGNORECASE,
 )
