@@ -539,6 +539,90 @@ async def webhook_kiwify(payload: dict):
     return {"ok": True, "email": email}
 
 
+# --- Página de cortesia ---
+
+CORTESIA_HTML = """<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baixar Agora — Cortesia</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f7;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+    .card{background:#fff;border-radius:20px;padding:40px;max-width:420px;width:100%;box-shadow:0 4px 30px rgba(0,0,0,.08);text-align:center}
+    .icon{font-size:48px;margin-bottom:16px}
+    h1{font-size:24px;font-weight:700;color:#1d1d1f;margin-bottom:8px}
+    p{color:#6e6e73;font-size:15px;line-height:1.5;margin-bottom:24px}
+    input{width:100%;padding:14px 16px;border:1.5px solid #d2d2d7;border-radius:12px;font-size:16px;outline:none;transition:border-color .2s;margin-bottom:12px}
+    input:focus{border-color:#5e17eb}
+    button{width:100%;padding:14px;background:#5e17eb;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:opacity .2s}
+    button:hover{opacity:.85}
+    button:disabled{opacity:.5;cursor:default}
+    .msg{margin-top:16px;font-size:14px}
+    .success{color:#30d158}
+    .error{color:#ff3b30}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">🎁</div>
+  <h1>Dar Cortesia</h1>
+  <p>Digite a chave admin e o e-mail da pessoa para liberar o acesso gratuito.</p>
+  <form id="form">
+    <input type="password" id="admin_key" placeholder="Chave admin" required />
+    <input type="email" id="email" placeholder="email-da-pessoa@gmail.com" required />
+    <button type="submit" id="btn">Liberar acesso</button>
+  </form>
+  <p class="msg" id="msg"></p>
+</div>
+<script>
+document.getElementById('form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('btn');
+  const msg = document.getElementById('msg');
+  btn.textContent = 'Liberando...';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/admin/comprador', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Admin-Key': document.getElementById('admin_key').value},
+      body: JSON.stringify({email: document.getElementById('email').value})
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.className = 'msg success';
+      msg.textContent = '✅ Acesso liberado! O e-mail de ativação foi enviado.';
+      // Disparar e-mail de ativação automaticamente
+      await fetch('/ativar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email: document.getElementById('email').value})
+      });
+      document.getElementById('form').style.display = 'none';
+    } else {
+      msg.className = 'msg error';
+      msg.textContent = '❌ ' + (data.detail || 'Erro.');
+      btn.textContent = 'Liberar acesso';
+      btn.disabled = false;
+    }
+  } catch {
+    msg.className = 'msg error';
+    msg.textContent = '❌ Erro de conexão.';
+    btn.textContent = 'Liberar acesso';
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>"""
+
+
+@app.get("/cortesia", response_class=HTMLResponse)
+async def cortesia_page():
+    return HTMLResponse(CORTESIA_HTML)
+
+
 # --- Health ---
 
 
