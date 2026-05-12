@@ -43,10 +43,10 @@ SUPPORTED_URL_PATTERN = re.compile(
 
 # --- Database ---
 
-_pool: psycopg2.pool.ThreadedConnectionPool | None = None
+_pool = None
 
 
-def get_pool() -> psycopg2.pool.ThreadedConnectionPool:
+def get_pool():
     global _pool
     if _pool is None:
         r = urlparse(DATABASE_URL)
