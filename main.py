@@ -4,10 +4,7 @@ import shutil
 import tempfile
 import random
 import secrets
-import smtplib
 from datetime import datetime, timedelta, timezone
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from urllib.parse import urlparse, unquote
 
 import httpx
@@ -25,11 +22,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # --- Config ---
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 ADMIN_KEY = os.getenv("ADMIN_KEY", "")
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp-relay.brevo.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASS = os.getenv("SMTP_PASS", "")
-SMTP_FROM = os.getenv("SMTP_FROM", "Baixar Agora <noreply@baixaragora.com.br>")
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "Baixar Agora")
+SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "noreply@baixaragora.com.br")
 APP_URL = os.getenv("APP_URL", "https://app.baixaragora.com.br")
 
 KIWIFY_TOKEN = os.getenv("KIWIFY_TOKEN", "")
@@ -121,15 +116,19 @@ init_db()
 
 
 def send_email(to: str, subject: str, html_body: str):
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = SMTP_FROM
-    msg["To"] = to
-    msg.attach(MIMEText(html_body, "html"))
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASS)
-        server.sendmail(SMTP_USER, to, msg.as_string())
+    resp = httpx.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={"api-key": BREVO_API_KEY, "content-type": "application/json"},
+        json={
+            "sender": {"name": SMTP_FROM_NAME, "email": SMTP_FROM_EMAIL},
+            "to": [{"email": to}],
+            "subject": subject,
+            "htmlContent": html_body,
+        },
+        timeout=10,
+    )
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Brevo error {resp.status_code}: {resp.text}")
 
 
 # --- Helpers ---
