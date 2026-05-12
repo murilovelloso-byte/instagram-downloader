@@ -25,11 +25,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # --- Config ---
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 ADMIN_KEY = os.getenv("ADMIN_KEY", "")
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp-relay.brevo.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
-APP_URL = os.getenv("APP_URL", "https://instagram-downloader-wgvm.onrender.com")
+SMTP_FROM = os.getenv("SMTP_FROM", "Baixar Agora <noreply@baixaragora.com.br>")
+APP_URL = os.getenv("APP_URL", "https://app.baixaragora.com.br")
 
 KIWIFY_TOKEN = os.getenv("KIWIFY_TOKEN", "")
 
@@ -122,7 +123,7 @@ init_db()
 def send_email(to: str, subject: str, html_body: str):
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = SMTP_USER
+    msg["From"] = SMTP_FROM
     msg["To"] = to
     msg.attach(MIMEText(html_body, "html"))
     with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
