@@ -124,6 +124,9 @@ def init_db():
             cur.execute("""
                 ALTER TABLE temp_codigos ADD COLUMN IF NOT EXISTS token TEXT UNIQUE
             """)
+            cur.execute("""
+                ALTER TABLE compradores ADD COLUMN IF NOT EXISTS fonte TEXT DEFAULT 'compra'
+            """)
         conn.commit()
     finally:
         pool.putconn(conn)
@@ -151,6 +154,34 @@ def send_email(to: str, subject: str, html_body: str):
 
 
 # --- Helpers ---
+
+
+def gerar_ativacao(email: str, texto_intro: str) -> tuple:
+    """Gera código + token, salva no banco e retorna (subject, html_body)."""
+    codigo = str(random.randint(100000, 999999))
+    confirm_token = secrets.token_urlsafe(24)
+    expira_em = datetime.now(timezone.utc) + timedelta(minutes=30)
+    db_execute(
+        """INSERT INTO temp_codigos (email, codigo, expira_em, token)
+           VALUES (%s, %s, %s, %s)
+           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo,
+           expira_em = EXCLUDED.expira_em, token = EXCLUDED.token""",
+        (email, codigo, expira_em, confirm_token),
+    )
+    link = f"{APP_URL}/confirmar?token={confirm_token}"
+    html_body = f"""
+    <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
+      <img src="{APP_URL}/static/icone.png" alt="Baixar Agora" width="80" height="80" style="border-radius:18px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto">
+      <h2 style="color:#1d1d1f;margin-bottom:8px">Seu código de ativação</h2>
+      <p style="color:#6e6e73;margin-bottom:24px">{texto_intro}</p>
+      <div style="background:#f5f5f7;border-radius:12px;padding:20px;font-size:40px;font-weight:700;color:#5e17eb;letter-spacing:10px">{codigo}</div>
+      <p style="margin:24px 0 8px;color:#6e6e73">Ou clique no botão abaixo para ativar diretamente:</p>
+      <a href="{link}" style="display:inline-block;padding:14px 28px;background:#5e17eb;color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px">Ativar meu atalho</a>
+      <p style="color:#aeaeb2;font-size:13px;margin-top:24px">Este código expira em 30 minutos.</p>
+      <p style="color:#ff3b30;font-size:13px;margin-top:16px;line-height:1.5;border:1px solid #ff3b30;border-radius:10px;padding:12px;">⚠️ <strong>Atenção:</strong> Caso o código de ativação seja usado em mais de um aparelho, o seu acesso será revogado e o valor pago não será devolvido.</p>
+      <p style="color:#aeaeb2;font-size:12px;margin-top:24px;border-top:1px solid #f0f0f0;padding-top:16px">Dúvidas? <a href="mailto:suporte@baixaragora.com.br" style="color:#5e17eb;text-decoration:none">suporte@baixaragora.com.br</a></p>
+    </div>"""
+    return f"Código de ativação Baixar Agora: {codigo}", html_body
 
 
 def is_valid_url(url: str) -> bool:
@@ -403,33 +434,9 @@ async def post_ativar(body: AtivarRequest):
             detail="Acesso revogado. Entre em contato com o suporte.",
         )
 
-    codigo = str(random.randint(100000, 999999))
-    confirm_token = secrets.token_urlsafe(24)
-    expira_em = datetime.now(timezone.utc) + timedelta(minutes=30)
-
-    db_execute(
-        """INSERT INTO temp_codigos (email, codigo, expira_em, token) VALUES (%s, %s, %s, %s)
-           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, expira_em = EXCLUDED.expira_em, token = EXCLUDED.token""",
-        (email, codigo, expira_em, confirm_token),
-    )
-
-    link = f"{APP_URL}/confirmar?token={confirm_token}"
-    html_body = f"""
-    <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
-      <img src="{APP_URL}/static/icone.png" alt="Baixar Agora" width="80" height="80" style="border-radius:18px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto">
-      <h2 style="color:#1d1d1f;margin-bottom:8px">Seu código de ativação</h2>
-      <p style="color:#6e6e73;margin-bottom:24px">Use este código para ativar o atalho <strong>Baixar Agora</strong></p>
-      <div style="background:#f5f5f7;border-radius:12px;padding:20px;font-size:40px;font-weight:700;color:#5e17eb;letter-spacing:10px">{codigo}</div>
-      <p style="margin:24px 0 8px;color:#6e6e73">Ou clique no botão abaixo para ativar diretamente:</p>
-      <a href="{link}" style="display:inline-block;padding:14px 28px;background:#5e17eb;color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px">Ativar meu atalho</a>
-      <p style="color:#aeaeb2;font-size:13px;margin-top:24px">Este código expira em 30 minutos.</p>
-      <p style="color:#ff3b30;font-size:13px;margin-top:16px;line-height:1.5;border:1px solid #ff3b30;border-radius:10px;padding:12px;">⚠️ <strong>Atenção:</strong> Caso o código de ativação seja usado em mais de um aparelho, o seu acesso será revogado e o valor pago não será devolvido.</p>
-      <p style="color:#aeaeb2;font-size:12px;margin-top:24px;border-top:1px solid #f0f0f0;padding-top:16px">Dúvidas? Fale com a gente: <a href="mailto:suporte@baixaragora.com.br" style="color:#5e17eb;text-decoration:none">suporte@baixaragora.com.br</a></p>
-    </div>
-    """
-
+    subject, html_body = gerar_ativacao(email, "Use este código para ativar o atalho <strong>Baixar Agora</strong>")
     try:
-        send_email(email, f"Código de ativação Baixar Agora: {codigo}", html_body)
+        send_email(email, subject, html_body)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao enviar e-mail: {e}")
 
@@ -533,39 +540,15 @@ async def add_comprador(body: CompradorRequest, x_admin_key: str = Header(None))
     require_admin(x_admin_key)
     email = body.email.lower().strip()
     db_execute(
-        """INSERT INTO compradores (email, ativo) VALUES (%s, 1)
-           ON CONFLICT (email) DO UPDATE SET ativo = 1""",
+        """INSERT INTO compradores (email, ativo, fonte) VALUES (%s, 1, 'cortesia')
+           ON CONFLICT (email) DO UPDATE SET ativo = 1, fonte = 'cortesia'""",
         (email,),
     )
-
-    codigo = str(random.randint(100000, 999999))
-    confirm_token = secrets.token_urlsafe(24)
-    expira_em = datetime.now(timezone.utc) + timedelta(minutes=30)
-    db_execute(
-        """INSERT INTO temp_codigos (email, codigo, expira_em, token)
-           VALUES (%s, %s, %s, %s)
-           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, expira_em = EXCLUDED.expira_em, token = EXCLUDED.token""",
-        (email, codigo, expira_em, confirm_token),
-    )
-
-    link = f"{APP_URL}/confirmar?token={confirm_token}"
-    html_body = f"""
-    <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
-      <img src="{APP_URL}/static/icone.png" alt="Baixar Agora" width="80" height="80" style="border-radius:18px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto">
-      <h2 style="color:#1d1d1f;margin-bottom:8px">Seu código de ativação</h2>
-      <p style="color:#6e6e73;margin-bottom:24px">Você recebeu acesso ao atalho <strong>Baixar Agora</strong>. Use este código para ativar.</p>
-      <div style="background:#f5f5f7;border-radius:12px;padding:20px;font-size:40px;font-weight:700;color:#5e17eb;letter-spacing:10px">{codigo}</div>
-      <p style="margin:24px 0 8px;color:#6e6e73">Ou clique no botão abaixo para ativar diretamente:</p>
-      <a href="{link}" style="display:inline-block;padding:14px 28px;background:#5e17eb;color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px">Ativar meu atalho</a>
-      <p style="color:#aeaeb2;font-size:13px;margin-top:24px">Este código expira em 30 minutos.</p>
-      <p style="color:#aeaeb2;font-size:12px;margin-top:24px;border-top:1px solid #f0f0f0;padding-top:16px">Dúvidas? Fale com a gente: <a href="mailto:suporte@baixaragora.com.br" style="color:#5e17eb;text-decoration:none">suporte@baixaragora.com.br</a></p>
-    </div>
-    """
+    subject, html_body = gerar_ativacao(email, "Você recebeu acesso ao atalho <strong>Baixar Agora</strong>. Use este código para ativar.")
     try:
-        send_email(email, f"Código de ativação Baixar Agora: {codigo}", html_body)
+        send_email(email, subject, html_body)
     except Exception:
         pass
-
     return {"ok": True, "email": email, "status": "ativo"}
 
 
@@ -581,9 +564,21 @@ async def revoke_comprador(email: str, x_admin_key: str = Header(None)):
 async def list_compradores(x_admin_key: str = Header(None)):
     require_admin(x_admin_key)
     rows = db_fetchall(
-        "SELECT email, ativo, criado_em FROM compradores ORDER BY criado_em DESC"
+        "SELECT email, ativo, fonte, criado_em FROM compradores ORDER BY criado_em DESC"
     )
     return [dict(r) for r in rows]
+
+
+@app.post("/admin/reenviar/{email}")
+async def reenviar_ativacao(email: str, background_tasks: BackgroundTasks, x_admin_key: str = Header(None)):
+    require_admin(x_admin_key)
+    email = email.lower().strip()
+    comprador = db_fetchone("SELECT ativo FROM compradores WHERE email = %s", (email,))
+    if not comprador:
+        raise HTTPException(status_code=404, detail="Comprador não encontrado.")
+    subject, html_body = gerar_ativacao(email, "Aqui está seu novo código de ativação do atalho <strong>Baixar Agora</strong>")
+    background_tasks.add_task(send_email, email, subject, html_body)
+    return {"ok": True, "email": email}
 
 
 # --- Webhook Kiwify ---
@@ -608,37 +603,250 @@ async def webhook_kiwify(payload: dict, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=400, detail="E-mail do comprador não encontrado.")
 
     db_execute(
-        """INSERT INTO compradores (email, ativo) VALUES (%s, 1)
+        """INSERT INTO compradores (email, ativo, fonte) VALUES (%s, 1, 'compra')
            ON CONFLICT (email) DO UPDATE SET ativo = 1""",
         (email,),
     )
-
-    codigo = str(random.randint(100000, 999999))
-    confirm_token = secrets.token_urlsafe(24)
-    expira_em = datetime.now(timezone.utc) + timedelta(minutes=30)
-    db_execute(
-        """INSERT INTO temp_codigos (email, codigo, expira_em, token)
-           VALUES (%s, %s, %s, %s)
-           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, expira_em = EXCLUDED.expira_em, token = EXCLUDED.token""",
-        (email, codigo, expira_em, confirm_token),
-    )
-
-    link = f"{APP_URL}/confirmar?token={confirm_token}"
-    html_body = f"""
-    <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
-      <img src="{APP_URL}/static/icone.png" alt="Baixar Agora" width="80" height="80" style="border-radius:18px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto">
-      <h2 style="color:#1d1d1f;margin-bottom:8px">Seu código de ativação</h2>
-      <p style="color:#6e6e73;margin-bottom:24px">Obrigado pela compra! Use este código para ativar o atalho <strong>Baixar Agora</strong></p>
-      <div style="background:#f5f5f7;border-radius:12px;padding:20px;font-size:40px;font-weight:700;color:#5e17eb;letter-spacing:10px">{codigo}</div>
-      <p style="margin:24px 0 8px;color:#6e6e73">Ou clique no botão abaixo para ativar diretamente:</p>
-      <a href="{link}" style="display:inline-block;padding:14px 28px;background:#5e17eb;color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px">Ativar meu atalho</a>
-      <p style="color:#aeaeb2;font-size:13px;margin-top:24px">Este código expira em 30 minutos.</p>
-      <p style="color:#ff3b30;font-size:13px;margin-top:16px;line-height:1.5;border:1px solid #ff3b30;border-radius:10px;padding:12px;">⚠️ <strong>Atenção:</strong> Caso o código de ativação seja usado em mais de um aparelho, o seu acesso será revogado e o valor pago não será devolvido.</p>
-      <p style="color:#aeaeb2;font-size:12px;margin-top:24px;border-top:1px solid #f0f0f0;padding-top:16px">Dúvidas? Fale com a gente: <a href="mailto:suporte@baixaragora.com.br" style="color:#5e17eb;text-decoration:none">suporte@baixaragora.com.br</a></p>
-    </div>
-    """
-    background_tasks.add_task(send_email, email, f"Código de ativação Baixar Agora: {codigo}", html_body)
+    subject, html_body = gerar_ativacao(email, "Obrigado pela compra! Use este código para ativar o atalho <strong>Baixar Agora</strong>")
+    background_tasks.add_task(send_email, email, subject, html_body)
     return {"ok": True, "email": email}
+
+
+# --- Dashboard Admin ---
+
+DASHBOARD_HTML = """<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baixar Agora — Dashboard</title>
+<link rel="icon" type="image/png" href="/static/icone.png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f0f5;min-height:100vh;color:#1d1d1f}
+/* Login */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:linear-gradient(135deg,#f0f7e0 0%,#f0f0f5 60%)}
+.login-card{background:#fff;border-radius:20px;padding:40px;max-width:380px;width:100%;box-shadow:0 4px 30px rgba(0,0,0,.08);text-align:center}
+.login-card img{width:64px;height:64px;border-radius:14px;margin-bottom:16px}
+.login-card h1{font-size:22px;font-weight:700;margin-bottom:6px}
+.login-card p{color:#6e6e73;font-size:14px;margin-bottom:24px}
+.login-card input{width:100%;padding:13px 16px;border:1.5px solid #d2d2d7;border-radius:12px;font-size:16px;outline:none;margin-bottom:12px;transition:border-color .2s}
+.login-card input:focus{border-color:#5e17eb}
+.login-card button{width:100%;padding:13px;background:#5e17eb;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:opacity .2s}
+.login-card button:hover{opacity:.85}
+.login-err{color:#ff3b30;font-size:13px;margin-top:10px}
+/* Dashboard */
+.dash{display:none;flex-direction:column;min-height:100vh}
+.topbar{background:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e5ea;position:sticky;top:0;z-index:10}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.topbar-left img{width:36px;height:36px;border-radius:8px}
+.topbar-left span{font-size:17px;font-weight:700;color:#1d1d1f}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.btn-logout{padding:7px 14px;background:#f5f5f7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#3a3a3c}
+.btn-logout:hover{background:#e5e5ea}
+.content{padding:24px;max-width:1100px;margin:0 auto;width:100%}
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.stat{background:#fff;border-radius:16px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.05)}
+.stat-label{font-size:12px;font-weight:600;color:#aeaeb2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.stat-value{font-size:32px;font-weight:700;color:#1d1d1f}
+.stat-value.verde{color:#5c9e00}
+.stat-value.roxo{color:#5e17eb}
+.stat-value.vermelho{color:#ff3b30}
+.stat-value.laranja{color:#ff9500}
+/* Tabela */
+.table-card{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.05);overflow:hidden}
+.table-header{padding:18px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f0f5}
+.table-header h2{font-size:16px;font-weight:700}
+.search{padding:8px 14px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:14px;outline:none;width:220px;transition:border-color .2s}
+.search:focus{border-color:#5e17eb}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:11px 16px;font-size:12px;font-weight:600;color:#aeaeb2;text-transform:uppercase;letter-spacing:.5px;background:#fafafa;border-bottom:1px solid #f0f0f5}
+td{padding:13px 16px;font-size:14px;border-bottom:1px solid #f5f5f7;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafafa}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.badge-ativo{background:#e8f9ee;color:#1a7f3c}
+.badge-revogado{background:#ffeef0;color:#c0392b}
+.badge-compra{background:#ede8fb;color:#5e17eb}
+.badge-cortesia{background:#fff3e0;color:#e67e22}
+.actions{display:flex;gap:8px}
+.btn{padding:6px 12px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:opacity .2s;white-space:nowrap}
+.btn:hover{opacity:.8}
+.btn-revogar{background:#ffeef0;color:#c0392b}
+.btn-ativar{background:#e8f9ee;color:#1a7f3c}
+.btn-reenviar{background:#ede8fb;color:#5e17eb}
+.empty{text-align:center;padding:40px;color:#aeaeb2;font-size:14px}
+.loading{text-align:center;padding:40px;color:#aeaeb2}
+@media(max-width:700px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .search{width:140px}
+  td,th{padding:10px 10px}
+  .actions{flex-direction:column;gap:4px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <img src="/static/icone.png" alt="Baixar Agora">
+    <h1>Dashboard</h1>
+    <p>Digite a chave admin para continuar</p>
+    <input type="password" id="loginKey" placeholder="Chave admin" autofocus>
+    <button onclick="entrar()">Entrar</button>
+    <p class="login-err" id="loginErr"></p>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dash" id="dash">
+  <div class="topbar">
+    <div class="topbar-left">
+      <img src="/static/icone.png" alt="">
+      <span>Baixar Agora — Dashboard</span>
+    </div>
+    <div class="topbar-right">
+      <span id="lastUpdate" style="font-size:12px;color:#aeaeb2"></span>
+      <button class="btn-logout" onclick="sair()">Sair</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Total</div><div class="stat-value" id="sTotal">—</div></div>
+      <div class="stat"><div class="stat-label">Ativos</div><div class="stat-value verde" id="sAtivos">—</div></div>
+      <div class="stat"><div class="stat-label">Revogados</div><div class="stat-value vermelho" id="sRevogados">—</div></div>
+      <div class="stat"><div class="stat-label">Cortesias</div><div class="stat-value laranja" id="sCortesias">—</div></div>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <h2>Compradores</h2>
+        <input class="search" type="text" id="search" placeholder="Buscar e-mail..." oninput="filtrar()">
+      </div>
+      <div id="tableWrap"><div class="loading">Carregando...</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let dados = [];
+let adminKey = '';
+
+function entrar() {
+  const key = document.getElementById('loginKey').value.trim();
+  if (!key) return;
+  fetch('/admin/compradores', {headers:{'X-Admin-Key': key}})
+    .then(r => {
+      if (!r.ok) throw new Error('negado');
+      return r.json();
+    })
+    .then(data => {
+      adminKey = key;
+      sessionStorage.setItem('admin_key', key);
+      document.getElementById('loginWrap').style.display = 'none';
+      document.getElementById('dash').style.display = 'flex';
+      processar(data);
+    })
+    .catch(() => {
+      document.getElementById('loginErr').textContent = '❌ Chave incorreta.';
+    });
+}
+
+document.getElementById('loginKey').addEventListener('keydown', e => { if(e.key==='Enter') entrar(); });
+
+function sair() {
+  sessionStorage.removeItem('admin_key');
+  location.reload();
+}
+
+function processar(data) {
+  dados = data;
+  const total = data.length;
+  const ativos = data.filter(d => d.ativo).length;
+  const revogados = total - ativos;
+  const cortesias = data.filter(d => d.fonte === 'cortesia').length;
+  document.getElementById('sTotal').textContent = total;
+  document.getElementById('sAtivos').textContent = ativos;
+  document.getElementById('sRevogados').textContent = revogados;
+  document.getElementById('sCortesias').textContent = cortesias;
+  const now = new Date();
+  document.getElementById('lastUpdate').textContent = 'Atualizado ' + now.toLocaleTimeString('pt-BR');
+  renderTabela(data);
+}
+
+function renderTabela(lista) {
+  const wrap = document.getElementById('tableWrap');
+  if (!lista.length) { wrap.innerHTML = '<div class="empty">Nenhum resultado encontrado.</div>'; return; }
+  const rows = lista.map(d => {
+    const statusBadge = d.ativo
+      ? '<span class="badge badge-ativo">Ativo</span>'
+      : '<span class="badge badge-revogado">Revogado</span>';
+    const fonteBadge = d.fonte === 'cortesia'
+      ? '<span class="badge badge-cortesia">Cortesia</span>'
+      : '<span class="badge badge-compra">Compra</span>';
+    const data = d.criado_em ? new Date(d.criado_em).toLocaleDateString('pt-BR') : '—';
+    const btnToggle = d.ativo
+      ? `<button class="btn btn-revogar" onclick="revogar('${d.email}')">Revogar</button>`
+      : `<button class="btn btn-ativar" onclick="reativar('${d.email}')">Reativar</button>`;
+    return `<tr>
+      <td>${d.email}</td>
+      <td>${fonteBadge}</td>
+      <td>${statusBadge}</td>
+      <td>${data}</td>
+      <td><div class="actions">${btnToggle}<button class="btn btn-reenviar" onclick="reenviar('${d.email}')">Reenviar</button></div></td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `<table>
+    <thead><tr><th>E-mail</th><th>Tipo</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function filtrar() {
+  const q = document.getElementById('search').value.toLowerCase();
+  renderTabela(dados.filter(d => d.email.toLowerCase().includes(q)));
+}
+
+function recarregar() {
+  fetch('/admin/compradores', {headers:{'X-Admin-Key': adminKey}})
+    .then(r => r.json()).then(processar);
+}
+
+async function revogar(email) {
+  if (!confirm('Revogar acesso de ' + email + '?')) return;
+  await fetch('/admin/comprador/' + encodeURIComponent(email), {method:'DELETE', headers:{'X-Admin-Key': adminKey}});
+  recarregar();
+}
+
+async function reativar(email) {
+  await fetch('/admin/comprador', {method:'POST', headers:{'Content-Type':'application/json','X-Admin-Key': adminKey}, body: JSON.stringify({email})});
+  recarregar();
+}
+
+async function reenviar(email) {
+  const btn = event.target;
+  btn.textContent = '...';
+  btn.disabled = true;
+  await fetch('/admin/reenviar/' + encodeURIComponent(email), {method:'POST', headers:{'X-Admin-Key': adminKey}});
+  btn.textContent = '✅ Enviado';
+  setTimeout(() => { btn.textContent = 'Reenviar'; btn.disabled = false; }, 3000);
+}
+
+// Auto-login se tiver chave salva
+const saved = sessionStorage.getItem('admin_key');
+if (saved) {
+  document.getElementById('loginKey').value = saved;
+  entrar();
+}
+</script>
+</body>
+</html>"""
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def dashboard():
+    return HTMLResponse(DASHBOARD_HTML)
 
 
 # --- Página de cortesia ---
