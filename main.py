@@ -103,8 +103,12 @@ def init_db():
             CREATE TABLE IF NOT EXISTS temp_codigos (
                 email TEXT PRIMARY KEY,
                 codigo TEXT NOT NULL,
-                expira_em TIMESTAMPTZ NOT NULL
+                expira_em TIMESTAMPTZ NOT NULL,
+                token TEXT UNIQUE
             )
+        """)
+        cur.execute("""
+            ALTER TABLE temp_codigos ADD COLUMN IF NOT EXISTS token TEXT UNIQUE
         """)
     conn.commit()
     conn.close()
@@ -385,15 +389,16 @@ async def post_ativar(body: AtivarRequest):
         )
 
     codigo = str(random.randint(100000, 999999))
+    confirm_token = secrets.token_urlsafe(24)
     expira_em = datetime.now(timezone.utc) + timedelta(minutes=30)
 
     db_execute(
-        """INSERT INTO temp_codigos (email, codigo, expira_em) VALUES (%s, %s, %s)
-           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, expira_em = EXCLUDED.expira_em""",
-        (email, codigo, expira_em),
+        """INSERT INTO temp_codigos (email, codigo, expira_em, token) VALUES (%s, %s, %s, %s)
+           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, expira_em = EXCLUDED.expira_em, token = EXCLUDED.token""",
+        (email, codigo, expira_em, confirm_token),
     )
 
-    link = f"{APP_URL}/confirmar?email={email}&codigo={codigo}"
+    link = f"{APP_URL}/confirmar?token={confirm_token}"
     html_body = f"""
     <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
       <img src="{APP_URL}/static/icone.png" alt="Baixar Agora" width="80" height="80" style="border-radius:18px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto">
@@ -417,21 +422,20 @@ async def post_ativar(body: AtivarRequest):
 
 
 @app.get("/confirmar", response_class=HTMLResponse)
-async def confirmar(email: str = Query(...), codigo: str = Query(...)):
-    email = email.lower().strip()
-
+async def confirmar(token: str = Query(...)):
     temp = db_fetchone(
-        "SELECT codigo, expira_em FROM temp_codigos WHERE email = %s", (email,)
+        "SELECT email, expira_em FROM temp_codigos WHERE token = %s", (token,)
     )
 
-    if not temp or temp["codigo"] != codigo:
-        return HTMLResponse(build_erro_html("Código inválido."), status_code=400)
+    if not temp:
+        return HTMLResponse(build_erro_html("Link inválido ou já utilizado."), status_code=400)
 
     if datetime.now(timezone.utc) > temp["expira_em"]:
         return HTMLResponse(
-            build_erro_html("Código expirado. Solicite um novo código."), status_code=400
+            build_erro_html("Link expirado. Solicite um novo código."), status_code=400
         )
 
+    email = temp["email"]
     existing = db_fetchone("SELECT chave FROM chaves WHERE email = %s", (email,))
 
     if existing:
@@ -440,7 +444,7 @@ async def confirmar(email: str = Query(...), codigo: str = Query(...)):
         chave = secrets.token_hex(8)
         db_execute("INSERT INTO chaves (email, chave) VALUES (%s, %s)", (email, chave))
 
-    db_execute("DELETE FROM temp_codigos WHERE email = %s", (email,))
+    db_execute("DELETE FROM temp_codigos WHERE token = %s", (token,))
 
     return HTMLResponse(build_confirmar_html(chave))
 
@@ -520,15 +524,16 @@ async def add_comprador(body: CompradorRequest, x_admin_key: str = Header(None))
     )
 
     codigo = str(random.randint(100000, 999999))
+    confirm_token = secrets.token_urlsafe(24)
     expira_em = datetime.now(timezone.utc) + timedelta(minutes=30)
     db_execute(
-        """INSERT INTO temp_codigos (email, codigo, expira_em)
-           VALUES (%s, %s, %s)
-           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, expira_em = EXCLUDED.expira_em""",
-        (email, codigo, expira_em),
+        """INSERT INTO temp_codigos (email, codigo, expira_em, token)
+           VALUES (%s, %s, %s, %s)
+           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, expira_em = EXCLUDED.expira_em, token = EXCLUDED.token""",
+        (email, codigo, expira_em, confirm_token),
     )
 
-    link = f"{APP_URL}/confirmar?email={email}&codigo={codigo}"
+    link = f"{APP_URL}/confirmar?token={confirm_token}"
     html_body = f"""
     <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
       <img src="{APP_URL}/static/icone.png" alt="Baixar Agora" width="80" height="80" style="border-radius:18px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto">
@@ -595,15 +600,16 @@ async def webhook_kiwify(payload: dict):
     )
 
     codigo = str(random.randint(100000, 999999))
+    confirm_token = secrets.token_urlsafe(24)
     expira_em = datetime.now(timezone.utc) + timedelta(minutes=30)
     db_execute(
-        """INSERT INTO temp_codigos (email, codigo, expira_em)
-           VALUES (%s, %s, %s)
-           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, expira_em = EXCLUDED.expira_em""",
-        (email, codigo, expira_em),
+        """INSERT INTO temp_codigos (email, codigo, expira_em, token)
+           VALUES (%s, %s, %s, %s)
+           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, expira_em = EXCLUDED.expira_em, token = EXCLUDED.token""",
+        (email, codigo, expira_em, confirm_token),
     )
 
-    link = f"{APP_URL}/confirmar?email={email}&codigo={codigo}"
+    link = f"{APP_URL}/confirmar?token={confirm_token}"
     html_body = f"""
     <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
       <img src="{APP_URL}/static/icone.png" alt="Baixar Agora" width="80" height="80" style="border-radius:18px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto">
