@@ -137,16 +137,20 @@ init_db()
 # --- Email ---
 
 
-def send_email(to: str, subject: str, html_body: str):
+def send_email(to: str, subject: str, html_body: str, text_body: str = ""):
+    payload = {
+        "sender": {"name": SMTP_FROM_NAME, "email": SMTP_FROM_EMAIL},
+        "to": [{"email": to}],
+        "subject": subject,
+        "htmlContent": html_body,
+        "headers": {"X-Mailin-notrace": "true"},
+    }
+    if text_body:
+        payload["textContent"] = text_body
     resp = httpx.post(
         "https://api.brevo.com/v3/smtp/email",
         headers={"api-key": BREVO_API_KEY, "content-type": "application/json"},
-        json={
-            "sender": {"name": SMTP_FROM_NAME, "email": SMTP_FROM_EMAIL},
-            "to": [{"email": to}],
-            "subject": subject,
-            "htmlContent": html_body,
-        },
+        json=payload,
         timeout=10,
     )
     if resp.status_code >= 400:
@@ -157,7 +161,7 @@ def send_email(to: str, subject: str, html_body: str):
 
 
 def gerar_ativacao(email: str, texto_intro: str) -> tuple:
-    """Gera código + token, salva no banco e retorna (subject, html_body)."""
+    """Gera código + token, salva no banco e retorna (subject, html_body, text_body)."""
     codigo = str(random.randint(100000, 999999))
     confirm_token = secrets.token_urlsafe(24)
     expira_em = datetime.now(timezone.utc) + timedelta(minutes=30)
@@ -169,19 +173,37 @@ def gerar_ativacao(email: str, texto_intro: str) -> tuple:
         (email, codigo, expira_em, confirm_token),
     )
     link = f"{APP_URL}/confirmar?token={confirm_token}"
+    texto_intro_plain = re.sub(r"<[^>]+>", "", texto_intro)
     html_body = f"""
     <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
       <img src="{APP_URL}/static/icone.png" alt="Baixar Agora" width="80" height="80" style="border-radius:18px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto">
       <h2 style="color:#1d1d1f;margin-bottom:8px">Seu código de ativação</h2>
-      <p style="color:#6e6e73;margin-bottom:24px">{texto_intro}</p>
+      <p style="color:#6e6e73;margin-bottom:8px">{texto_intro}</p>
+      <p style="color:#6e6e73;margin-bottom:24px">Digite o código abaixo no atalho quando ele solicitar para ativar seu acesso. O código é pessoal, intransferível e válido por 30 minutos.</p>
       <div style="background:#f5f5f7;border-radius:12px;padding:20px;font-size:40px;font-weight:700;color:#5e17eb;letter-spacing:10px">{codigo}</div>
-      <p style="margin:24px 0 8px;color:#6e6e73">Ou clique no botão abaixo para ativar diretamente:</p>
+      <p style="margin:24px 0 8px;color:#6e6e73">Prefere ativar sem digitar o código? Clique no botão abaixo e a ativação acontece automaticamente:</p>
       <a href="{link}" style="display:inline-block;padding:14px 28px;background:#5e17eb;color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px">Ativar meu atalho</a>
-      <p style="color:#aeaeb2;font-size:13px;margin-top:24px">Este código expira em 30 minutos.</p>
+      <p style="color:#aeaeb2;font-size:13px;margin-top:24px">Este código expira em 30 minutos a partir do recebimento deste e-mail. Após expirar, acesse o site novamente para solicitar um novo código.</p>
       <p style="color:#ff3b30;font-size:13px;margin-top:16px;line-height:1.5;border:1px solid #ff3b30;border-radius:10px;padding:12px;">⚠️ <strong>Atenção:</strong> Caso o código de ativação seja usado em mais de um aparelho, o seu acesso será revogado e o valor pago não será devolvido.</p>
       <p style="color:#aeaeb2;font-size:12px;margin-top:24px;border-top:1px solid #f0f0f0;padding-top:16px">Dúvidas? <a href="mailto:suporte@baixaragora.com.br" style="color:#5e17eb;text-decoration:none">suporte@baixaragora.com.br</a></p>
     </div>"""
-    return f"Código de ativação Baixar Agora: {codigo}", html_body
+    text_body = f"""Baixar Agora — Código de ativação
+
+{texto_intro_plain}
+
+Digite o código abaixo no atalho quando ele solicitar para ativar seu acesso.
+O código é pessoal, intransferível e válido por 30 minutos.
+
+Seu código: {codigo}
+
+Prefere ativar sem digitar? Acesse o link abaixo:
+{link}
+
+ATENÇÃO: Caso o código seja usado em mais de um aparelho, o acesso será revogado sem direito a reembolso.
+
+Dúvidas? suporte@baixaragora.com.br
+"""
+    return f"Código de ativação Baixar Agora: {codigo}", html_body, text_body
 
 
 def is_valid_url(url: str) -> bool:
@@ -434,9 +456,9 @@ async def post_ativar(body: AtivarRequest):
             detail="Acesso revogado. Entre em contato com o suporte.",
         )
 
-    subject, html_body = gerar_ativacao(email, "Use este código para ativar o atalho <strong>Baixar Agora</strong>")
+    subject, html_body, text_body = gerar_ativacao(email, "Use este código para ativar o atalho <strong>Baixar Agora</strong>")
     try:
-        send_email(email, subject, html_body)
+        send_email(email, subject, html_body, text_body)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao enviar e-mail: {e}")
 
@@ -544,9 +566,9 @@ async def add_comprador(body: CompradorRequest, x_admin_key: str = Header(None))
            ON CONFLICT (email) DO UPDATE SET ativo = 1, fonte = 'cortesia'""",
         (email,),
     )
-    subject, html_body = gerar_ativacao(email, "Você recebeu acesso ao atalho <strong>Baixar Agora</strong>. Use este código para ativar.")
+    subject, html_body, text_body = gerar_ativacao(email, "Você recebeu acesso ao atalho <strong>Baixar Agora</strong>. Use este código para ativar.")
     try:
-        send_email(email, subject, html_body)
+        send_email(email, subject, html_body, text_body)
     except Exception:
         pass
     return {"ok": True, "email": email, "status": "ativo"}
@@ -625,8 +647,8 @@ async def reenviar_ativacao(email: str, background_tasks: BackgroundTasks, x_adm
     comprador = db_fetchone("SELECT ativo FROM compradores WHERE email = %s", (email,))
     if not comprador:
         raise HTTPException(status_code=404, detail="Comprador não encontrado.")
-    subject, html_body = gerar_ativacao(email, "Aqui está seu novo código de ativação do atalho <strong>Baixar Agora</strong>")
-    background_tasks.add_task(send_email, email, subject, html_body)
+    subject, html_body, text_body = gerar_ativacao(email, "Aqui está seu novo código de ativação do atalho <strong>Baixar Agora</strong>")
+    background_tasks.add_task(send_email, email, subject, html_body, text_body)
     return {"ok": True, "email": email}
 
 
@@ -656,8 +678,8 @@ async def webhook_kiwify(payload: dict, background_tasks: BackgroundTasks):
            ON CONFLICT (email) DO UPDATE SET ativo = 1""",
         (email,),
     )
-    subject, html_body = gerar_ativacao(email, "Obrigado pela compra! Use este código para ativar o atalho <strong>Baixar Agora</strong>")
-    background_tasks.add_task(send_email, email, subject, html_body)
+    subject, html_body, text_body = gerar_ativacao(email, "Obrigado pela compra! Use este código para ativar o atalho <strong>Baixar Agora</strong>")
+    background_tasks.add_task(send_email, email, subject, html_body, text_body)
     return {"ok": True, "email": email}
 
 
