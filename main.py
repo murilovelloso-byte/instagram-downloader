@@ -16,9 +16,11 @@ import psycopg2.extras
 import yt_dlp
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 app = FastAPI(title="Baixar Agora API")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # --- Config ---
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -342,6 +344,7 @@ async def post_ativar(body: AtivarRequest):
     link = f"{APP_URL}/confirmar?email={email}&codigo={codigo}"
     html_body = f"""
     <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
+      <img src="{APP_URL}/static/icone.png" alt="Baixar Agora" width="80" height="80" style="border-radius:18px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto">
       <h2 style="color:#1d1d1f;margin-bottom:8px">Seu código de ativação</h2>
       <p style="color:#6e6e73;margin-bottom:24px">Use este código para ativar o atalho <strong>Baixar Agora</strong></p>
       <div style="background:#f5f5f7;border-radius:12px;padding:20px;font-size:40px;font-weight:700;color:#5e17eb;letter-spacing:10px">{codigo}</div>
@@ -349,6 +352,7 @@ async def post_ativar(body: AtivarRequest):
       <a href="{link}" style="display:inline-block;padding:14px 28px;background:#5e17eb;color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px">Ativar meu atalho</a>
       <p style="color:#aeaeb2;font-size:13px;margin-top:24px">Este código expira em 30 minutos.</p>
       <p style="color:#ff3b30;font-size:13px;margin-top:16px;line-height:1.5;border:1px solid #ff3b30;border-radius:10px;padding:12px;">⚠️ <strong>Atenção:</strong> Caso o código de ativação seja usado em mais de um aparelho, o seu acesso será revogado e o valor pago não será devolvido.</p>
+      <p style="color:#aeaeb2;font-size:12px;margin-top:24px;border-top:1px solid #f0f0f0;padding-top:16px">Dúvidas? Fale com a gente: <a href="mailto:suporte@baixaragora.com.br" style="color:#5e17eb;text-decoration:none">suporte@baixaragora.com.br</a></p>
     </div>
     """
 
@@ -522,6 +526,7 @@ async def webhook_kiwify(payload: dict):
     link = f"{APP_URL}/confirmar?email={email}&codigo={codigo}"
     html_body = f"""
     <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
+      <img src="{APP_URL}/static/icone.png" alt="Baixar Agora" width="80" height="80" style="border-radius:18px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto">
       <h2 style="color:#1d1d1f;margin-bottom:8px">Seu código de ativação</h2>
       <p style="color:#6e6e73;margin-bottom:24px">Obrigado pela compra! Use este código para ativar o atalho <strong>Baixar Agora</strong></p>
       <div style="background:#f5f5f7;border-radius:12px;padding:20px;font-size:40px;font-weight:700;color:#5e17eb;letter-spacing:10px">{codigo}</div>
@@ -529,6 +534,7 @@ async def webhook_kiwify(payload: dict):
       <a href="{link}" style="display:inline-block;padding:14px 28px;background:#5e17eb;color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px">Ativar meu atalho</a>
       <p style="color:#aeaeb2;font-size:13px;margin-top:24px">Este código expira em 30 minutos.</p>
       <p style="color:#ff3b30;font-size:13px;margin-top:16px;line-height:1.5;border:1px solid #ff3b30;border-radius:10px;padding:12px;">⚠️ <strong>Atenção:</strong> Caso o código de ativação seja usado em mais de um aparelho, o seu acesso será revogado e o valor pago não será devolvido.</p>
+      <p style="color:#aeaeb2;font-size:12px;margin-top:24px;border-top:1px solid #f0f0f0;padding-top:16px">Dúvidas? Fale com a gente: <a href="mailto:suporte@baixaragora.com.br" style="color:#5e17eb;text-decoration:none">suporte@baixaragora.com.br</a></p>
     </div>
     """
     try:
