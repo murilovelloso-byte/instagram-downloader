@@ -658,182 +658,291 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- PLACEHOLDER_START -->
 <title>Baixar Agora — Dashboard</title>
 <link rel="icon" type="image/png" href="/static/icone.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f0f5;min-height:100vh;color:#1d1d1f}
-.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:linear-gradient(135deg,#f0f7e0 0%,#f0f0f5 60%)}
-.login-card{background:#fff;border-radius:20px;padding:40px;max-width:380px;width:100%;box-shadow:0 4px 30px rgba(0,0,0,.08);text-align:center}
-.login-card img{width:64px;height:64px;border-radius:14px;margin-bottom:16px}
-.login-card h1{font-size:22px;font-weight:700;margin-bottom:6px}
-.login-card p{color:#6e6e73;font-size:14px;margin-bottom:24px}
-.login-card input{width:100%;padding:13px 16px;border:1.5px solid #d2d2d7;border-radius:12px;font-size:16px;outline:none;margin-bottom:12px;transition:border-color .2s}
-.login-card input:focus{border-color:#5e17eb}
-.login-card button{width:100%;padding:13px;background:#5e17eb;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:opacity .2s}
-.login-card button:hover{opacity:.85}
-.login-err{color:#ff3b30;font-size:13px;margin-top:10px}
-.dash{display:none;flex-direction:column;min-height:100vh}
-.topbar{background:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e5ea;position:sticky;top:0;z-index:10}
-.topbar-left{display:flex;align-items:center;gap:12px}
-.topbar-left img{width:36px;height:36px;border-radius:8px}
-.topbar-left span{font-size:17px;font-weight:700;color:#1d1d1f}
-.topbar-right{display:flex;align-items:center;gap:12px}
-.btn-logout{padding:7px 14px;background:#f5f5f7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#3a3a3c}
-.btn-logout:hover{background:#e5e5ea}
-.content{padding:24px;max-width:1200px;margin:0 auto;width:100%}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
-.stat{background:#fff;border-radius:16px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.05)}
-.stat-label{font-size:12px;font-weight:600;color:#aeaeb2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
-.stat-value{font-size:32px;font-weight:700;color:#1d1d1f}
-.stat-value.roxo{color:#5e17eb}
-.stat-value.laranja{color:#ff9500}
-.stat-value.vermelho{color:#ff3b30}
-.stat-value.amarelo{color:#a36200}
-.table-card{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.05);overflow:hidden}
-.table-header{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f0f5;gap:12px;flex-wrap:wrap}
-.table-header h2{font-size:16px;font-weight:700}
-.table-header-right{display:flex;align-items:center;gap:10px}
-.btn-add{padding:8px 16px;background:#5e17eb;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .2s;white-space:nowrap}
-.btn-add:hover{opacity:.85}
-.search{padding:8px 14px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:14px;outline:none;width:200px;transition:border-color .2s}
-.search:focus{border-color:#5e17eb}
-.filters{display:flex;gap:8px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid #f0f0f5;background:#fafafa}
-.pill{padding:5px 14px;border:1.5px solid #e5e5ea;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;background:#fff;color:#6e6e73;transition:all .15s;user-select:none}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f1f5f9;color:#1e293b}
+/* ── LOGIN ── */
+#loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%);padding:20px}
+.lcard{background:#fff;border-radius:20px;padding:40px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.lcard img{width:64px;height:64px;border-radius:14px;margin:0 auto 16px;display:block}
+.lcard h1{font-size:22px;font-weight:700;margin-bottom:6px;color:#1e293b}
+.lcard p{color:#64748b;font-size:14px;margin-bottom:24px}
+.lcard input{width:100%;padding:13px 16px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:16px;outline:none;margin-bottom:12px;transition:border-color .2s;color:#1e293b;display:block}
+.lcard input:focus{border-color:#5e17eb}
+.lcard button{width:100%;padding:13px;background:#5e17eb;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:opacity .2s}
+.lcard button:hover{opacity:.88}
+/* ── LAYOUT ── */
+#app{display:none}
+.sidebar{width:240px;background:#0f172a;position:fixed;top:0;left:0;height:100vh;display:flex;flex-direction:column;z-index:100}
+.main{margin-left:240px;min-height:100vh;display:flex;flex-direction:column}
+/* ── SIDEBAR ── */
+.sb-logo{padding:22px 20px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.07)}
+.sb-logo img{width:36px;height:36px;border-radius:9px;flex-shrink:0}
+.sb-app-name{font-size:15px;font-weight:700;color:#f1f5f9}
+.sb-app-sub{font-size:11px;color:#475569;margin-top:1px}
+.sb-nav{flex:1;padding:14px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.sb-sep{font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;letter-spacing:.8px;padding:12px 12px 6px}
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:#94a3b8;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left}
+.nav-item svg{flex-shrink:0;opacity:.75}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#cbd5e1}
+.nav-item:hover svg{opacity:1}
+.nav-item.active{background:rgba(94,23,235,.2);color:#c4b5fd}
+.nav-item.active svg{opacity:1}
+.sb-footer{padding:12px 10px;border-top:1px solid rgba(255,255,255,.07)}
+.nav-logout{color:#f87171 !important}
+/* ── TOPBAR ── */
+.topbar{background:#fff;padding:15px 28px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;gap:12px}
+.page-title{font-size:18px;font-weight:700;color:#1e293b}
+.page-sub{font-size:12px;color:#94a3b8;margin-top:1px}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.btn-topbar{padding:7px 13px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#64748b;transition:all .15s;white-space:nowrap}
+.btn-topbar:hover{border-color:#5e17eb;color:#5e17eb}
+.btn-topbar.on{background:#ecfdf5;border-color:#10b981;color:#059669}
+/* ── CONTENT ── */
+.content{padding:24px 28px;flex:1}
+/* ── STAT CARDS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:#fff;border-radius:14px;padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 2px 10px rgba(0,0,0,.04);display:flex;align-items:center;gap:16px;transition:box-shadow .2s}
+.stat-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.stat-card.featured{background:linear-gradient(135deg,#5e17eb 0%,#7c3aed 100%);box-shadow:0 4px 20px rgba(94,23,235,.35)}
+.stat-card.featured:hover{box-shadow:0 6px 28px rgba(94,23,235,.45)}
+.stat-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.si-white{background:rgba(255,255,255,.2)}
+.si-purple{background:rgba(94,23,235,.1)}
+.si-orange{background:rgba(245,158,11,.1)}
+.si-amber{background:rgba(180,83,9,.1)}
+.stat-label{font-size:12px;font-weight:600;color:#64748b;margin-bottom:5px}
+.stat-value{font-size:28px;font-weight:700;color:#1e293b;line-height:1}
+.featured .stat-label{color:rgba(255,255,255,.7)}
+.featured .stat-value{color:#fff}
+/* ── CHART CARD ── */
+.chart-card{background:#fff;border-radius:14px;padding:22px 24px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 2px 10px rgba(0,0,0,.04);margin-bottom:24px}
+.chart-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}
+.chart-title{font-size:15px;font-weight:700;color:#1e293b}
+.chart-sub{font-size:12px;color:#94a3b8;margin-top:2px;margin-bottom:14px}
+.chart-tabs{display:flex;gap:6px;flex-shrink:0}
+.chart-tab{padding:5px 13px;border:1.5px solid #e2e8f0;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#64748b;transition:all .15s}
+.chart-tab.active{background:#5e17eb;border-color:#5e17eb;color:#fff}
+@keyframes drawLine{to{stroke-dashoffset:0}}
+.chart-tip{position:absolute;background:#1e293b;color:#fff;border-radius:10px;padding:9px 14px;font-size:12px;pointer-events:none;white-space:nowrap;transform:translateX(-50%);z-index:20;display:none;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.chart-tip-date{color:#94a3b8;font-size:11px;margin-bottom:3px}
+.chart-tip-val{font-weight:700;font-size:15px}
+/* ── TABLE CARD ── */
+.table-card{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 2px 10px rgba(0,0,0,.04);overflow:hidden}
+.table-hdr{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border-bottom:1px solid #f1f5f9}
+.table-hdr h2{font-size:15px;font-weight:700;color:#1e293b}
+.tbl-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn-sec{padding:8px 13px;background:#f8fafc;color:#475569;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.btn-sec:hover{border-color:#5e17eb;color:#5e17eb}
+.btn-pri{padding:8px 15px;background:#5e17eb;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .2s;white-space:nowrap}
+.btn-pri:hover{opacity:.87}
+.srch-wrap{position:relative}
+.srch{padding:8px 12px 8px 32px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;outline:none;width:190px;transition:border-color .2s;color:#1e293b}
+.srch:focus{border-color:#5e17eb}
+.filters{display:flex;gap:6px;flex-wrap:wrap;padding:10px 20px;border-bottom:1px solid #f1f5f9;background:#f8fafc}
+.pill{padding:5px 13px;border:1.5px solid #e2e8f0;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;background:#fff;color:#64748b;transition:all .15s;user-select:none}
 .pill.active{background:#5e17eb;border-color:#5e17eb;color:#fff}
 .pill:hover:not(.active){border-color:#5e17eb;color:#5e17eb}
 table{width:100%;border-collapse:collapse}
-th{text-align:left;padding:11px 16px;font-size:12px;font-weight:600;color:#aeaeb2;text-transform:uppercase;letter-spacing:.5px;background:#fafafa;border-bottom:1px solid #f0f0f5}
-td{padding:12px 16px;font-size:14px;border-bottom:1px solid #f5f5f7;vertical-align:middle}
+thead{background:#f8fafc}
+th{text-align:left;padding:11px 18px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid #f1f5f9}
+td{padding:13px 18px;font-size:13.5px;border-bottom:1px solid #f8fafc;vertical-align:middle;color:#374151}
 tr:last-child td{border-bottom:none}
-tr:hover td{background:#fafafa}
-.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
-.badge-ativo{background:#e8f9ee;color:#1a7f3c}
-.badge-revogado{background:#ffeef0;color:#c0392b}
-.badge-compra{background:#ede8fb;color:#5e17eb}
-.badge-cortesia{background:#fff3e0;color:#b35c00}
-.badge-ativado{background:#e8f9ee;color:#1a7f3c}
-.badge-aguardando{background:#fff8e0;color:#a36200}
+tbody tr:hover td{background:#fafbff}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600}
+.badge-ativo{background:#ecfdf5;color:#059669}
+.badge-revogado{background:#fef2f2;color:#dc2626}
+.badge-compra{background:#f3f0ff;color:#5e17eb}
+.badge-cortesia{background:#fff7ed;color:#c2410c}
+.badge-ativado{background:#ecfdf5;color:#059669}
+.badge-aguardando{background:#fffbeb;color:#b45309}
 .badge-tipo{cursor:pointer;transition:opacity .15s}
 .badge-tipo:hover{opacity:.7}
-.actions{display:flex;gap:8px;flex-wrap:wrap}
-.btn{padding:6px 12px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:opacity .2s;white-space:nowrap}
-.btn:hover{opacity:.8}
-.btn-revogar{background:#ffeef0;color:#c0392b}
-.btn-ativar{background:#e8f9ee;color:#1a7f3c}
-.btn-reenviar{background:#ede8fb;color:#5e17eb}
-.empty{text-align:center;padding:40px;color:#aeaeb2;font-size:14px}
-.loading{text-align:center;padding:40px;color:#aeaeb2}
-/* Modal */
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;padding:20px}
+.row-acts{display:flex;gap:6px;flex-wrap:wrap}
+.ra{padding:5px 11px;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;transition:opacity .2s;white-space:nowrap}
+.ra:hover{opacity:.8}
+.ra-rev{background:#fef2f2;color:#dc2626}
+.ra-ati{background:#ecfdf5;color:#059669}
+.ra-env{background:#f3f0ff;color:#5e17eb}
+.tbl-empty{text-align:center;padding:48px;color:#94a3b8;font-size:14px}
+.tbl-load{text-align:center;padding:48px;color:#94a3b8}
+/* ── MODAL ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:200;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)}
 .modal-bg.open{display:flex}
-.modal{background:#fff;border-radius:20px;padding:32px;max-width:380px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.15)}
-.modal h2{font-size:20px;font-weight:700;margin-bottom:8px}
-.modal p{color:#6e6e73;font-size:14px;margin-bottom:20px}
-.modal input{width:100%;padding:13px 16px;border:1.5px solid #d2d2d7;border-radius:12px;font-size:16px;outline:none;margin-bottom:8px;transition:border-color .2s}
+.modal{background:#fff;border-radius:18px;padding:32px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal h2{font-size:20px;font-weight:700;margin-bottom:8px;color:#1e293b}
+.modal p{color:#64748b;font-size:14px;margin-bottom:20px}
+.modal input{width:100%;padding:13px 16px;border:1.5px solid #e2e8f0;border-radius:11px;font-size:16px;outline:none;margin-bottom:8px;transition:border-color .2s;color:#1e293b}
 .modal input:focus{border-color:#5e17eb}
 .modal-msg{font-size:13px;min-height:18px;margin-bottom:12px}
 .modal-btns{display:flex;gap:10px}
-.modal-btns button{flex:1;padding:13px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s}
-.btn-cancel{background:#f5f5f7;color:#3a3a3c}
+.modal-btns button{flex:1;padding:13px;border:none;border-radius:11px;font-size:15px;font-weight:600;cursor:pointer}
+.btn-cancel{background:#f1f5f9;color:#475569}
 .btn-confirm{background:#5e17eb;color:#fff}
-.btn-confirm:hover{opacity:.85}
-/* Chart */
-.chart-card{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.05);padding:20px 24px 16px;margin-bottom:28px}
-.chart-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
-.chart-title{font-size:15px;font-weight:700;color:#1d1d1f}
-.chart-sub{font-size:12px;color:#aeaeb2;margin-top:2px;margin-bottom:14px}
-.chart-tabs{display:flex;gap:6px}
-.chart-tab{padding:4px 12px;border:1.5px solid #e5e5ea;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#6e6e73;transition:all .15s}
-.chart-tab.active{background:#5e17eb;border-color:#5e17eb;color:#fff}
-@keyframes drawLine{to{stroke-dashoffset:0}}
-.chart-tip{position:absolute;background:#1d1d1f;color:#fff;border-radius:10px;padding:9px 14px;font-size:12px;pointer-events:none;white-space:nowrap;transform:translateX(-50%);z-index:20;display:none}
-.chart-tip-date{color:#a0a0ab;font-size:11px;margin-bottom:3px}
-.chart-tip-val{font-weight:700;font-size:15px}
-/* Auto-refresh */
-.btn-refresh{padding:7px 14px;background:#f5f5f7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#3a3a3c;transition:background .2s}
-.btn-refresh:hover{background:#e5e5ea}
-.btn-refresh.on{background:#e8f9ee;color:#1a7f3c}
-/* Export */
-.btn-export{padding:8px 14px;background:#f5f5f7;color:#3a3a3c;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s;white-space:nowrap}
-.btn-export:hover{background:#e5e5ea}
-@media(max-width:700px){
-  .stats{grid-template-columns:repeat(2,1fr)}
-  .search{width:130px}
-  td,th{padding:10px 10px}
-  .actions{flex-direction:column;gap:4px}
-  .table-header-right{flex-wrap:wrap}
+.btn-confirm:hover{opacity:.87}
+/* ── RESPONSIVE ── */
+.hamburger{display:none;align-items:center;justify-content:center;width:34px;height:34px;background:#f1f5f9;border:none;border-radius:8px;cursor:pointer;color:#475569;flex-shrink:0}
+.mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99}
+@media(max-width:880px){
+  .sidebar{transform:translateX(-100%);transition:transform .25s;z-index:100}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}
+  .topbar{padding:13px 16px}
+  .content{padding:14px 16px}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  th,td{padding:10px 12px}
+  .row-acts{flex-direction:column;gap:4px}
+  .srch{width:140px}
   .chart-tabs{display:none}
+  .hamburger{display:flex}
+  .mob-overlay.show{display:block}
 }
 </style>
 </head>
 <body>
 
-<div class="login-wrap" id="loginWrap">
-  <div class="login-card">
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="lcard">
     <img src="/static/icone.png" alt="Baixar Agora">
     <h1>Dashboard</h1>
     <p>Digite a chave admin para continuar</p>
     <input type="password" id="loginKey" placeholder="Chave admin" autofocus>
     <button onclick="entrar()">Entrar</button>
-    <p class="login-err" id="loginErr"></p>
+    <p id="loginErr" style="color:#ef4444;font-size:13px;margin-top:10px;min-height:20px"></p>
   </div>
 </div>
 
-<div class="dash" id="dash">
-  <div class="topbar">
-    <div class="topbar-left">
+<!-- OVERLAY MOBILE -->
+<div class="mob-overlay" id="mobOverlay" onclick="closeSidebar()"></div>
+
+<!-- APP -->
+<div id="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-logo">
       <img src="/static/icone.png" alt="">
-      <span>Baixar Agora — Dashboard</span>
+      <div><div class="sb-app-name">Baixar Agora</div><div class="sb-app-sub">Admin Panel</div></div>
     </div>
-    <div class="topbar-right">
-      <span id="lastUpdate" style="font-size:12px;color:#aeaeb2"></span>
-      <button class="btn-refresh" id="btnRefresh" onclick="toggleAutoRefresh()">⟳ Auto</button>
-      <button class="btn-logout" onclick="sair()">Sair</button>
+    <nav class="sb-nav">
+      <div class="sb-sep">Menu</div>
+      <button class="nav-item active" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" onclick="document.getElementById('compradores').scrollIntoView({behavior:'smooth'})">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        Compradores
+      </button>
+      <button class="nav-item" onclick="document.getElementById('grafico').scrollIntoView({behavior:'smooth'})">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Estatísticas
+      </button>
+      <button class="nav-item" onclick="abrirModal()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>
+        + Cortesia
+      </button>
+    </nav>
+    <div class="sb-footer">
+      <button class="nav-item nav-logout" onclick="sair()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sair
+      </button>
     </div>
-  </div>
-  <div class="content">
-    <div class="stats">
-      <div class="stat"><div class="stat-label">Total Ativo</div><div class="stat-value" id="sTotal">—</div></div>
-      <div class="stat"><div class="stat-label">Compras</div><div class="stat-value roxo" id="sCompras">—</div></div>
-      <div class="stat"><div class="stat-label">Cortesias</div><div class="stat-value laranja" id="sCortesias">—</div></div>
-      <div class="stat"><div class="stat-label">Aguardando</div><div class="stat-value amarelo" id="sAguardando">—</div></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-top">
-        <div>
-          <div class="chart-title">Crescimento de cadastros</div>
-        </div>
-        <div class="chart-tabs">
-          <span class="chart-tab active" data-periodo="30" onclick="setPeriodo(this)">30d</span>
-          <span class="chart-tab" data-periodo="7" onclick="setPeriodo(this)">7d</span>
-        </div>
-      </div>
-      <div class="chart-sub" id="chartSub">Carregando...</div>
-      <div id="graficoWrap" style="min-height:120px;position:relative"><div class="loading" style="padding:30px">Carregando...</div></div>
-    </div>
+  </aside>
 
-    <div class="table-card">
-      <div class="table-header">
-        <h2>Compradores</h2>
-        <div class="table-header-right">
-          <button class="btn-export" onclick="exportarCSV()">⬇ CSV</button>
-          <button class="btn-add" onclick="abrirModal()">+ Cortesia</button>
-          <input class="search" type="text" id="search" placeholder="Buscar e-mail..." oninput="atualizar()">
+  <div class="main">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="hamburger" onclick="openSidebar()">
+          <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-sub" id="lastUpdate">Carregando...</div>
         </div>
       </div>
-      <div class="filters" id="filtersBar">
-        <span class="pill active" data-filtro="todos" onclick="setFiltro(this)">Todos</span>
-        <span class="pill" data-filtro="compra" onclick="setFiltro(this)">Compra</span>
-        <span class="pill" data-filtro="cortesia" onclick="setFiltro(this)">Cortesia</span>
-        <span class="pill" data-filtro="aguardando" onclick="setFiltro(this)">Aguardando</span>
-        <span class="pill" data-filtro="revogado" onclick="setFiltro(this)">Revogado</span>
+      <div class="topbar-right">
+        <button class="btn-topbar" id="btnRefresh" onclick="toggleAutoRefresh()">⟳ Auto</button>
       </div>
-      <div id="tableWrap"><div class="loading">Carregando...</div></div>
+    </header>
+
+    <div class="content">
+
+      <!-- STATS -->
+      <div class="stats-grid">
+        <div class="stat-card featured">
+          <div class="stat-icon si-white">
+            <svg width="22" height="22" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+          </div>
+          <div><div class="stat-label">Total Ativo</div><div class="stat-value" id="sTotal">—</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon si-purple">
+            <svg width="20" height="20" fill="none" stroke="#5e17eb" stroke-width="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          </div>
+          <div><div class="stat-label">Compras</div><div class="stat-value" id="sCompras" style="color:#5e17eb">—</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon si-orange">
+            <svg width="20" height="20" fill="none" stroke="#f59e0b" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>
+          </div>
+          <div><div class="stat-label">Cortesias</div><div class="stat-value" id="sCortesias" style="color:#f59e0b">—</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon si-amber">
+            <svg width="20" height="20" fill="none" stroke="#b45309" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div><div class="stat-label">Aguardando</div><div class="stat-value" id="sAguardando" style="color:#b45309">—</div></div>
+        </div>
+      </div>
+
+      <!-- CHART -->
+      <div class="chart-card" id="grafico">
+        <div class="chart-head">
+          <div class="chart-title">Crescimento de cadastros</div>
+          <div class="chart-tabs">
+            <span class="chart-tab active" data-periodo="30" onclick="setPeriodo(this)">30d</span>
+            <span class="chart-tab" data-periodo="7" onclick="setPeriodo(this)">7d</span>
+          </div>
+        </div>
+        <div class="chart-sub" id="chartSub">Carregando...</div>
+        <div id="graficoWrap" style="min-height:120px;position:relative"><div class="tbl-load">Carregando...</div></div>
+      </div>
+
+      <!-- TABLE -->
+      <div class="table-card" id="compradores">
+        <div class="table-hdr">
+          <h2>Compradores</h2>
+          <div class="tbl-acts">
+            <button class="btn-sec" onclick="exportarCSV()">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              CSV
+            </button>
+            <button class="btn-pri" onclick="abrirModal()">+ Cortesia</button>
+            <div class="srch-wrap">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;color:#94a3b8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="srch" id="search" type="text" placeholder="Buscar e-mail..." oninput="atualizar()">
+            </div>
+          </div>
+        </div>
+        <div class="filters">
+          <span class="pill active" data-filtro="todos" onclick="setFiltro(this)">Todos</span>
+          <span class="pill" data-filtro="compra" onclick="setFiltro(this)">Compra</span>
+          <span class="pill" data-filtro="cortesia" onclick="setFiltro(this)">Cortesia</span>
+          <span class="pill" data-filtro="aguardando" onclick="setFiltro(this)">Aguardando</span>
+          <span class="pill" data-filtro="revogado" onclick="setFiltro(this)">Revogado</span>
+        </div>
+        <div id="tableWrap"><div class="tbl-load">Carregando...</div></div>
+      </div>
+
     </div>
   </div>
 </div>
 
+<!-- MODAL -->
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <h2>🎁 Dar Cortesia</h2>
@@ -848,9 +957,7 @@ tr:hover td{background:#fafafa}
 </div>
 
 <script>
-let dados = [];
-let adminKey = '';
-let filtroAtivo = 'todos';
+let dados = [], adminKey = '', filtroAtivo = 'todos';
 
 function entrar() {
   const key = document.getElementById('loginKey').value.trim();
@@ -860,28 +967,24 @@ function entrar() {
     .then(data => {
       adminKey = key;
       sessionStorage.setItem('admin_key', key);
-      document.getElementById('loginWrap').style.display = 'none';
-      document.getElementById('dash').style.display = 'flex';
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
       processar(data);
       carregarGrafico();
     })
     .catch(() => { document.getElementById('loginErr').textContent = '❌ Chave incorreta.'; });
 }
-
 document.getElementById('loginKey').addEventListener('keydown', e => { if(e.key==='Enter') entrar(); });
-
 function sair() { sessionStorage.removeItem('admin_key'); location.reload(); }
+function openSidebar() { document.getElementById('sidebar').classList.add('open'); document.getElementById('mobOverlay').classList.add('show'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mobOverlay').classList.remove('show'); }
 
 function processar(data) {
   dados = data;
-  const ativos = data.filter(d => d.ativo).length;
-  const compras = data.filter(d => d.fonte === 'compra' && d.ativo).length;
-  const cortesias = data.filter(d => d.fonte === 'cortesia' && d.ativo).length;
-  const aguardando = data.filter(d => d.ativo && !d.ativado).length;
-  document.getElementById('sTotal').textContent = ativos;
-  document.getElementById('sCompras').textContent = compras;
-  document.getElementById('sCortesias').textContent = cortesias;
-  document.getElementById('sAguardando').textContent = aguardando;
+  document.getElementById('sTotal').textContent = data.filter(d => d.ativo).length;
+  document.getElementById('sCompras').textContent = data.filter(d => d.fonte==='compra' && d.ativo).length;
+  document.getElementById('sCortesias').textContent = data.filter(d => d.fonte==='cortesia' && d.ativo).length;
+  document.getElementById('sAguardando').textContent = data.filter(d => d.ativo && !d.ativado).length;
   document.getElementById('lastUpdate').textContent = 'Atualizado ' + new Date().toLocaleTimeString('pt-BR');
   renderTabela(getFiltrado());
 }
@@ -897,324 +1000,168 @@ function getFiltrado() {
     return true;
   });
 }
-
 function setFiltro(el) {
   filtroAtivo = el.dataset.filtro;
   document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
   renderTabela(getFiltrado());
 }
-
 function atualizar() { renderTabela(getFiltrado()); }
 
 function renderTabela(lista) {
   const wrap = document.getElementById('tableWrap');
-  if (!lista.length) { wrap.innerHTML = '<div class="empty">Nenhum resultado encontrado.</div>'; return; }
+  if (!lista.length) { wrap.innerHTML = '<div class="tbl-empty">Nenhum resultado encontrado.</div>'; return; }
   const rows = lista.map(d => {
-    const novoTipo = d.fonte === 'cortesia' ? 'compra' : 'cortesia';
-    const novoLabel = d.fonte === 'cortesia' ? 'Compra' : 'Cortesia';
-    const fonteBadge = d.fonte === 'cortesia'
-      ? `<span class="badge badge-cortesia badge-tipo" title="Clique para mudar para Compra" onclick="mudarTipo('${d.email}','${novoTipo}','${novoLabel}')">Cortesia ✏️</span>`
-      : `<span class="badge badge-compra badge-tipo" title="Clique para mudar para Cortesia" onclick="mudarTipo('${d.email}','${novoTipo}','${novoLabel}')">Compra ✏️</span>`;
-    const ativacaoBadge = d.ativado
-      ? '<span class="badge badge-ativado">Ativado ✅</span>'
-      : '<span class="badge badge-aguardando">Aguardando ⏳</span>';
-    const statusBadge = d.ativo
-      ? '<span class="badge badge-ativo">Ativo</span>'
-      : '<span class="badge badge-revogado">Revogado</span>';
+    const nt = d.fonte==='cortesia'?'compra':'cortesia', nl = d.fonte==='cortesia'?'Compra':'Cortesia';
+    const fb = d.fonte==='cortesia'
+      ? `<span class="badge badge-cortesia badge-tipo" title="Mudar para Compra" onclick="mudarTipo('${d.email}','${nt}','${nl}')">Cortesia ✏️</span>`
+      : `<span class="badge badge-compra badge-tipo" title="Mudar para Cortesia" onclick="mudarTipo('${d.email}','${nt}','${nl}')">Compra ✏️</span>`;
+    const ab = d.ativado ? '<span class="badge badge-ativado">Ativado ✅</span>' : '<span class="badge badge-aguardando">Aguardando ⏳</span>';
+    const sb = d.ativo ? '<span class="badge badge-ativo">Ativo</span>' : '<span class="badge badge-revogado">Revogado</span>';
     const dt = d.criado_em ? new Date(d.criado_em).toLocaleDateString('pt-BR') : '—';
-    const btnToggle = d.ativo
-      ? `<button class="btn btn-revogar" onclick="revogar('${d.email}')">Revogar</button>`
-      : `<button class="btn btn-ativar" onclick="reativar('${d.email}')">Reativar</button>`;
-    return `<tr>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.email}</td>
-      <td>${fonteBadge}</td>
-      <td>${ativacaoBadge}</td>
-      <td>${statusBadge}</td>
-      <td style="white-space:nowrap">${dt}</td>
-      <td><div class="actions">${btnToggle}<button class="btn btn-reenviar" onclick="reenviar(event,'${d.email}')">Reenviar</button></div></td>
-    </tr>`;
+    const bt = d.ativo
+      ? `<button class="ra ra-rev" onclick="revogar('${d.email}')">Revogar</button>`
+      : `<button class="ra ra-ati" onclick="reativar('${d.email}')">Reativar</button>`;
+    return `<tr><td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.email}</td><td>${fb}</td><td>${ab}</td><td>${sb}</td><td style="color:#94a3b8;font-size:13px">${dt}</td><td><div class="row-acts">${bt}<button class="ra ra-env" onclick="reenviar(event,'${d.email}')">Reenviar</button></div></td></tr>`;
   }).join('');
-  wrap.innerHTML = `<table>
-    <thead><tr><th>E-mail</th><th>Tipo</th><th>Ativação</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
+  wrap.innerHTML = `<table><thead><tr><th>E-mail</th><th>Tipo</th><th>Ativação</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-function recarregar() {
-  fetch('/admin/compradores', {headers:{'X-Admin-Key': adminKey}})
-    .then(r => r.json()).then(processar);
-}
-
-async function mudarTipo(email, novoTipo, novoLabel) {
-  if (!confirm('Mudar tipo de "' + email + '" para ' + novoLabel + '?')) return;
-  await fetch('/admin/comprador/' + encodeURIComponent(email), {
-    method: 'PATCH',
-    headers: {'Content-Type': 'application/json', 'X-Admin-Key': adminKey},
-    body: JSON.stringify({fonte: novoTipo})
-  });
+function recarregar() { fetch('/admin/compradores',{headers:{'X-Admin-Key':adminKey}}).then(r=>r.json()).then(processar); }
+async function mudarTipo(email,nt,nl) {
+  if(!confirm('Mudar tipo de "'+email+'" para '+nl+'?')) return;
+  await fetch('/admin/comprador/'+encodeURIComponent(email),{method:'PATCH',headers:{'Content-Type':'application/json','X-Admin-Key':adminKey},body:JSON.stringify({fonte:nt})});
   recarregar();
 }
-
 async function revogar(email) {
-  if (!confirm('Revogar acesso de ' + email + '?')) return;
-  await fetch('/admin/comprador/' + encodeURIComponent(email), {method:'DELETE', headers:{'X-Admin-Key': adminKey}});
+  if(!confirm('Revogar acesso de '+email+'?')) return;
+  await fetch('/admin/comprador/'+encodeURIComponent(email),{method:'DELETE',headers:{'X-Admin-Key':adminKey}});
   recarregar();
 }
-
-async function reativar(email) {
-  await fetch('/admin/reativar/' + encodeURIComponent(email), {method:'POST', headers:{'X-Admin-Key': adminKey}});
-  recarregar();
+async function reativar(email) { await fetch('/admin/reativar/'+encodeURIComponent(email),{method:'POST',headers:{'X-Admin-Key':adminKey}}); recarregar(); }
+async function reenviar(e,email) {
+  const btn=e.target; btn.textContent='...'; btn.disabled=true;
+  await fetch('/admin/reenviar/'+encodeURIComponent(email),{method:'POST',headers:{'X-Admin-Key':adminKey}});
+  btn.textContent='✅ Enviado';
+  setTimeout(()=>{btn.textContent='Reenviar';btn.disabled=false;},3000);
 }
-
-async function reenviar(e, email) {
-  const btn = e.target;
-  btn.textContent = '...';
-  btn.disabled = true;
-  await fetch('/admin/reenviar/' + encodeURIComponent(email), {method:'POST', headers:{'X-Admin-Key': adminKey}});
-  btn.textContent = '✅ Enviado';
-  setTimeout(() => { btn.textContent = 'Reenviar'; btn.disabled = false; }, 3000);
-}
-
 function abrirModal() {
-  document.getElementById('modalEmail').value = '';
-  document.getElementById('modalMsg').textContent = '';
-  document.getElementById('modalMsg').style.color = '';
-  document.getElementById('modalBtn').disabled = false;
-  document.getElementById('modalBtn').textContent = 'Liberar';
+  document.getElementById('modalEmail').value='';
+  document.getElementById('modalMsg').textContent='';
+  document.getElementById('modalMsg').style.color='';
+  document.getElementById('modalBtn').disabled=false;
+  document.getElementById('modalBtn').textContent='Liberar';
   document.getElementById('modalBg').classList.add('open');
-  setTimeout(() => document.getElementById('modalEmail').focus(), 100);
+  setTimeout(()=>document.getElementById('modalEmail').focus(),100);
 }
-
-function fecharModal() {
-  document.getElementById('modalBg').classList.remove('open');
-}
-
-document.getElementById('modalBg').addEventListener('click', e => {
-  if (e.target === document.getElementById('modalBg')) fecharModal();
-});
-
-document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModal(); });
-
+function fecharModal() { document.getElementById('modalBg').classList.remove('open'); }
+document.getElementById('modalBg').addEventListener('click',e=>{if(e.target===document.getElementById('modalBg'))fecharModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')fecharModal();});
 async function darCortesia() {
-  const email = document.getElementById('modalEmail').value.trim();
-  const msg = document.getElementById('modalMsg');
-  const btn = document.getElementById('modalBtn');
-  if (!email) return;
-  btn.disabled = true;
-  btn.textContent = 'Liberando...';
+  const email=document.getElementById('modalEmail').value.trim();
+  const msg=document.getElementById('modalMsg'), btn=document.getElementById('modalBtn');
+  if(!email) return;
+  btn.disabled=true; btn.textContent='Liberando...';
   try {
-    const res = await fetch('/admin/comprador', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json', 'X-Admin-Key': adminKey},
-      body: JSON.stringify({email})
-    });
-    const data = await res.json();
-    if (res.ok) {
-      msg.style.color = '#30d158';
-      msg.textContent = '✅ Acesso liberado! E-mail de ativação enviado.';
-      setTimeout(() => { fecharModal(); recarregar(); }, 1800);
-    } else {
-      msg.style.color = '#ff3b30';
-      msg.textContent = '❌ ' + (data.detail || 'Erro ao liberar.');
-      btn.disabled = false;
-      btn.textContent = 'Liberar';
-    }
-  } catch {
-    msg.style.color = '#ff3b30';
-    msg.textContent = '❌ Erro de conexão.';
-    btn.disabled = false;
-    btn.textContent = 'Liberar';
-  }
+    const res=await fetch('/admin/comprador',{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Key':adminKey},body:JSON.stringify({email})});
+    const data=await res.json();
+    if(res.ok){msg.style.color='#059669';msg.textContent='✅ Acesso liberado! E-mail enviado.';setTimeout(()=>{fecharModal();recarregar();},1800);}
+    else{msg.style.color='#dc2626';msg.textContent='❌ '+(data.detail||'Erro.');btn.disabled=false;btn.textContent='Liberar';}
+  } catch{msg.style.color='#dc2626';msg.textContent='❌ Erro de conexão.';btn.disabled=false;btn.textContent='Liberar';}
 }
-
-// --- CSV Export ---
 function exportarCSV() {
-  const header = ['E-mail','Tipo','Ativacao','Status','Data'];
-  const rows = dados.map(d => [
-    d.email,
-    d.fonte === 'cortesia' ? 'Cortesia' : 'Compra',
-    d.ativado ? 'Ativado' : 'Aguardando',
-    d.ativo ? 'Ativo' : 'Revogado',
-    d.criado_em ? new Date(d.criado_em).toLocaleDateString('pt-BR') : ''
-  ]);
-  const csv = [header, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\\n');
-  const blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'baixaragora-' + new Date().toISOString().slice(0,10) + '.csv';
-  a.click();
+  const h=['E-mail','Tipo','Ativacao','Status','Data'];
+  const r=dados.map(d=>[d.email,d.fonte==='cortesia'?'Cortesia':'Compra',d.ativado?'Ativado':'Aguardando',d.ativo?'Ativo':'Revogado',d.criado_em?new Date(d.criado_em).toLocaleDateString('pt-BR'):'']);
+  const csv=[h,...r].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='baixaragora-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
-
-// --- Auto-refresh ---
-let refreshTimer = null;
-let refreshCountdown = 60;
+let refreshTimer=null, refreshCountdown=60;
 function toggleAutoRefresh() {
-  const btn = document.getElementById('btnRefresh');
-  if (refreshTimer) {
-    clearInterval(refreshTimer);
-    refreshTimer = null;
-    btn.textContent = '⟳ Auto';
-    btn.classList.remove('on');
-  } else {
-    refreshCountdown = 60;
-    btn.textContent = '⟳ 60s';
-    btn.classList.add('on');
-    refreshTimer = setInterval(() => {
-      refreshCountdown--;
-      btn.textContent = '⟳ ' + refreshCountdown + 's';
-      if (refreshCountdown <= 0) {
-        refreshCountdown = 60;
-        recarregar();
-        carregarGrafico();
-      }
-    }, 1000);
+  const btn=document.getElementById('btnRefresh');
+  if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;btn.textContent='⟳ Auto';btn.classList.remove('on');}
+  else{
+    refreshCountdown=60;btn.textContent='⟳ 60s';btn.classList.add('on');
+    refreshTimer=setInterval(()=>{
+      refreshCountdown--;btn.textContent='⟳ '+refreshCountdown+'s';
+      if(refreshCountdown<=0){refreshCountdown=60;recarregar();carregarGrafico();}
+    },1000);
   }
 }
-
-// --- Gráfico de crescimento ---
-let graficoDados = [];
-let periodoDias = 30;
-
+let graficoDados=[], periodoDias=30;
 function carregarGrafico() {
-  fetch('/admin/stats/crescimento', {headers:{'X-Admin-Key': adminKey}})
-    .then(r => r.json())
-    .then(data => { graficoDados = data; desenharGrafico(periodoDias); })
-    .catch(() => {});
+  fetch('/admin/stats/crescimento',{headers:{'X-Admin-Key':adminKey}})
+    .then(r=>r.json()).then(data=>{graficoDados=data;desenharGrafico(periodoDias);}).catch(()=>{});
 }
-
 function setPeriodo(el) {
-  periodoDias = parseInt(el.dataset.periodo);
-  document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+  periodoDias=parseInt(el.dataset.periodo);
+  document.querySelectorAll('.chart-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
   desenharGrafico(periodoDias);
 }
-
 function desenharGrafico(dias) {
-  const wrap = document.getElementById('graficoWrap');
-  const hoje = new Date();
-  const mapa = {};
-  graficoDados.forEach(p => { mapa[p.dia] = p.total; });
-  const pontos = [];
-  for (let i = dias - 1; i >= 0; i--) {
-    const d = new Date(hoje);
-    d.setDate(d.getDate() - i);
-    const chave = d.toISOString().slice(0,10);
-    pontos.push({dia: chave, label: d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}), total: mapa[chave] || 0});
+  const wrap=document.getElementById('graficoWrap');
+  const hoje=new Date(), mapa={};
+  graficoDados.forEach(p=>{mapa[p.dia]=p.total;});
+  const pontos=[];
+  for(let i=dias-1;i>=0;i--){
+    const d=new Date(hoje);d.setDate(d.getDate()-i);
+    const k=d.toISOString().slice(0,10);
+    pontos.push({dia:k,label:d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}),total:mapa[k]||0});
   }
-  const n = pontos.length;
-  const maxVal = Math.max(...pontos.map(p => p.total), 1);
-  const total = pontos.reduce((s,p) => s + p.total, 0);
-  document.getElementById('chartSub').textContent = total + ' cadastro' + (total !== 1 ? 's' : '') + ' nos últimos ' + dias + ' dias';
-
-  const W = 580, H = 150;
-  const pL = 38, pR = 16, pT = 14, pB = 30;
-  const cw = W - pL - pR, ch = H - pT - pB;
-  const xp = i => pL + (n > 1 ? (i / (n-1)) * cw : cw / 2);
-  const yp = v => pT + ch - (v / maxVal) * ch;
-
-  // Smooth bezier path
-  function bezier(pts) {
-    if (!pts.length) return '';
-    if (pts.length === 1) return `M ${pts[0].x},${pts[0].y}`;
-    let d = `M ${pts[0].x},${pts[0].y}`;
-    for (let i = 1; i < pts.length; i++) {
-      const mx = (pts[i-1].x + pts[i].x) / 2;
-      d += ` C ${mx},${pts[i-1].y} ${mx},${pts[i].y} ${pts[i].x},${pts[i].y}`;
-    }
+  const n=pontos.length, maxVal=Math.max(...pontos.map(p=>p.total),1);
+  const total=pontos.reduce((s,p)=>s+p.total,0);
+  document.getElementById('chartSub').textContent=total+' cadastro'+(total!==1?'s':'')+' nos últimos '+dias+' dias';
+  const W=580,H=150,pL=38,pR=16,pT=14,pB=30,cw=W-pL-pR,ch=H-pT-pB;
+  const xp=i=>pL+(n>1?(i/(n-1))*cw:cw/2), yp=v=>pT+ch-(v/maxVal)*ch;
+  function bezier(pts){
+    if(!pts.length)return '';
+    if(pts.length===1)return `M ${pts[0].x},${pts[0].y}`;
+    let d=`M ${pts[0].x},${pts[0].y}`;
+    for(let i=1;i<pts.length;i++){const mx=(pts[i-1].x+pts[i].x)/2;d+=` C ${mx},${pts[i-1].y} ${mx},${pts[i].y} ${pts[i].x},${pts[i].y}`;}
     return d;
   }
-  const pts = pontos.map((p,i) => ({x: xp(i), y: yp(p.total)}));
-  const linePath = bezier(pts);
-  const areaPath = linePath + ` L ${xp(n-1)},${pT+ch} L ${xp(0)},${pT+ch} Z`;
-
-  // Horizontal grid lines
-  const gridTicks = [Math.ceil(maxVal*0.5), maxVal];
-  const gridSVG = gridTicks.map(v =>
-    `<line x1="${pL}" y1="${yp(v)}" x2="${pL+cw}" y2="${yp(v)}" stroke="#f0f0f5" stroke-width="1" stroke-dasharray="4,4"/>
-     <text x="${pL-6}" y="${yp(v)+4}" text-anchor="end" font-size="10" fill="#c7c7cc">${v}</text>`
-  ).join('');
-
-  // X labels (~5 evenly spaced)
-  const step = Math.max(1, Math.floor(n / 5));
-  const xSVG = pontos.map((p,i) => {
-    if (i % step !== 0 && i !== n-1) return '';
-    return `<text x="${xp(i)}" y="${H-4}" text-anchor="middle" font-size="10" fill="#c7c7cc">${p.label}</text>`;
-  }).join('');
-
-  // Dots (hidden, revealed on hover)
-  const dotSVG = pontos.map((p,i) =>
-    `<circle id="gd${i}" cx="${xp(i)}" cy="${yp(p.total)}" r="5" fill="#fff" stroke="#5e17eb" stroke-width="2.5" opacity="0" style="transition:opacity .12s"/>`
-  ).join('');
-
-  // Hit areas
-  const hw = Math.max(22, cw / n);
-  const hitSVG = pontos.map((p,i) =>
-    `<rect x="${xp(i)-hw/2}" y="${pT}" width="${hw}" height="${ch}" fill="transparent" style="cursor:crosshair" onmouseenter="showTip(event,${i},${xp(i).toFixed(1)},${yp(p.total).toFixed(1)})" onmouseleave="hideTip()"/>`
-  ).join('');
-
-  wrap.innerHTML = `
-  <div class="chart-tip" id="chartTip"><div class="chart-tip-date" id="tipDate"></div><div class="chart-tip-val" id="tipVal"></div></div>
+  const pts=pontos.map((p,i)=>({x:xp(i),y:yp(p.total)}));
+  const lp=bezier(pts), ap=lp+` L ${xp(n-1)},${pT+ch} L ${xp(0)},${pT+ch} Z`;
+  const gSVG=[Math.ceil(maxVal*.5),maxVal].map(v=>`<line x1="${pL}" y1="${yp(v)}" x2="${pL+cw}" y2="${yp(v)}" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="4,4"/><text x="${pL-6}" y="${yp(v)+4}" text-anchor="end" font-size="10" fill="#cbd5e1">${v}</text>`).join('');
+  const step=Math.max(1,Math.floor(n/5));
+  const xSVG=pontos.map((p,i)=>i%step!==0&&i!==n-1?'':`<text x="${xp(i)}" y="${H-4}" text-anchor="middle" font-size="10" fill="#cbd5e1">${p.label}</text>`).join('');
+  const dSVG=pontos.map((p,i)=>`<circle id="gd${i}" cx="${xp(i)}" cy="${yp(p.total)}" r="5" fill="#fff" stroke="#5e17eb" stroke-width="2.5" opacity="0" style="transition:opacity .12s"/>`).join('');
+  const hw=Math.max(22,cw/n);
+  const hSVG=pontos.map((p,i)=>`<rect x="${xp(i)-hw/2}" y="${pT}" width="${hw}" height="${ch}" fill="transparent" style="cursor:crosshair" onmouseenter="showTip(event,${i},${xp(i).toFixed(1)},${yp(p.total).toFixed(1)})" onmouseleave="hideTip()"/>`).join('');
+  wrap.innerHTML=`<div class="chart-tip" id="chartTip"><div class="chart-tip-date" id="tipDate"></div><div class="chart-tip-val" id="tipVal"></div></div>
   <svg id="chartSvg" viewBox="0 0 ${W} ${H}" style="width:100%;display:block;overflow:visible">
     <defs>
-      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#5e17eb" stop-opacity="0.18"/>
-        <stop offset="80%" stop-color="#5e17eb" stop-opacity="0.02"/>
-      </linearGradient>
+      <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5e17eb" stop-opacity="0.18"/><stop offset="80%" stop-color="#5e17eb" stop-opacity="0.02"/></linearGradient>
       <clipPath id="cc"><rect x="${pL}" y="${pT-2}" width="${cw+2}" height="${ch+4}"/></clipPath>
     </defs>
-    ${gridSVG}
-    <line x1="${pL}" y1="${pT+ch}" x2="${pL+cw}" y2="${pT+ch}" stroke="#e5e5ea" stroke-width="1"/>
+    ${gSVG}
+    <line x1="${pL}" y1="${pT+ch}" x2="${pL+cw}" y2="${pT+ch}" stroke="#e2e8f0" stroke-width="1"/>
     <line id="gvl" x1="0" y1="${pT}" x2="0" y2="${pT+ch}" stroke="#5e17eb" stroke-width="1.5" stroke-dasharray="4,3" opacity="0" style="transition:opacity .12s"/>
-    <g clip-path="url(#cc)">
-      <path d="${areaPath}" fill="url(#areaGrad)"/>
-      <path d="${linePath}" fill="none" stroke="#5e17eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-            stroke-dasharray="9999" stroke-dashoffset="9999" style="animation:drawLine .9s ease forwards"/>
-    </g>
-    ${dotSVG}${xSVG}${hitSVG}
+    <g clip-path="url(#cc)"><path d="${ap}" fill="url(#ag)"/><path d="${lp}" fill="none" stroke="#5e17eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="9999" stroke-dashoffset="9999" style="animation:drawLine .9s ease forwards"/></g>
+    ${dSVG}${xSVG}${hSVG}
   </svg>`;
-  window._gp = pontos;
+  window._gp=pontos;
 }
-
-function showTip(e, i, svgX, svgY) {
-  const svg = document.getElementById('chartSvg');
-  const wrap = document.getElementById('graficoWrap');
-  const tip = document.getElementById('chartTip');
-  const vl = document.getElementById('gvl');
-  const p = window._gp[i];
-  // Scale SVG units → CSS pixels relative to wrap
-  const sr = svg.getBoundingClientRect();
-  const wr = wrap.getBoundingClientRect();
-  const sx = sr.width / 580;
-  const sy = sr.height / 150;
-  const px = (sr.left - wr.left) + svgX * sx;
-  const py = (sr.top - wr.top) + svgY * sy;
-  // Keep tooltip inside container
-  const half = 70;
-  tip.style.left = Math.max(half, Math.min(px, wr.width - half)) + 'px';
-  tip.style.top = Math.max(4, py - 58) + 'px';
-  tip.style.display = 'block';
-  document.getElementById('tipDate').textContent = p.label;
-  document.getElementById('tipVal').textContent = p.total + (p.total === 1 ? ' cadastro' : ' cadastros');
-  vl.setAttribute('x1', svgX); vl.setAttribute('x2', svgX); vl.setAttribute('opacity', '0.35');
-  window._gp.forEach((_,j) => {
-    const d = document.getElementById('gd'+j);
-    if (d) d.setAttribute('opacity', j===i ? '1' : '0');
-  });
+function showTip(e,i,svgX,svgY) {
+  const svg=document.getElementById('chartSvg'),wrap=document.getElementById('graficoWrap'),tip=document.getElementById('chartTip'),vl=document.getElementById('gvl'),p=window._gp[i];
+  const sr=svg.getBoundingClientRect(),wr=wrap.getBoundingClientRect();
+  const px=(sr.left-wr.left)+svgX*(sr.width/580), py=(sr.top-wr.top)+svgY*(sr.height/150);
+  tip.style.left=Math.max(70,Math.min(px,wr.width-70))+'px';
+  tip.style.top=Math.max(4,py-58)+'px';
+  tip.style.display='block';
+  document.getElementById('tipDate').textContent=p.label;
+  document.getElementById('tipVal').textContent=p.total+(p.total===1?' cadastro':' cadastros');
+  vl.setAttribute('x1',svgX);vl.setAttribute('x2',svgX);vl.setAttribute('opacity','0.35');
+  window._gp.forEach((_,j)=>{const d=document.getElementById('gd'+j);if(d)d.setAttribute('opacity',j===i?'1':'0');});
 }
-
 function hideTip() {
-  const tip = document.getElementById('chartTip');
-  const vl = document.getElementById('gvl');
-  if (tip) tip.style.display = 'none';
-  if (vl) vl.setAttribute('opacity','0');
-  (window._gp||[]).forEach((_,j) => {
-    const d = document.getElementById('gd'+j);
-    if (d) d.setAttribute('opacity','0');
-  });
+  const tip=document.getElementById('chartTip'),vl=document.getElementById('gvl');
+  if(tip)tip.style.display='none';
+  if(vl)vl.setAttribute('opacity','0');
+  (window._gp||[]).forEach((_,j)=>{const d=document.getElementById('gd'+j);if(d)d.setAttribute('opacity','0');});
 }
 
-// --- Init ---
 const saved = sessionStorage.getItem('admin_key');
 if (saved) { document.getElementById('loginKey').value = saved; entrar(); }
 </script>
