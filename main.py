@@ -595,6 +595,19 @@ async def reativar_comprador(email: str, x_admin_key: str = Header(None)):
     return {"ok": True, "email": email}
 
 
+@app.get("/admin/stats/crescimento")
+async def stats_crescimento(x_admin_key: str = Header(None)):
+    require_admin(x_admin_key)
+    rows = db_fetchall(
+        """SELECT DATE(criado_em AT TIME ZONE 'America/Sao_Paulo') AS dia, COUNT(*) AS total
+           FROM compradores
+           WHERE criado_em >= NOW() - INTERVAL '30 days'
+           GROUP BY dia
+           ORDER BY dia"""
+    )
+    return [{"dia": str(r["dia"]), "total": int(r["total"])} for r in rows]
+
+
 @app.post("/admin/reenviar/{email}")
 async def reenviar_ativacao(email: str, background_tasks: BackgroundTasks, x_admin_key: str = Header(None)):
     require_admin(x_admin_key)
@@ -725,12 +738,28 @@ tr:hover td{background:#fafafa}
 .btn-cancel{background:#f5f5f7;color:#3a3a3c}
 .btn-confirm{background:#5e17eb;color:#fff}
 .btn-confirm:hover{opacity:.85}
+/* Chart */
+.chart-card{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.05);padding:20px 24px 16px;margin-bottom:28px}
+.chart-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.chart-title{font-size:15px;font-weight:700;color:#1d1d1f}
+.chart-sub{font-size:12px;color:#aeaeb2;margin-top:2px}
+.chart-tabs{display:flex;gap:6px}
+.chart-tab{padding:4px 12px;border:1.5px solid #e5e5ea;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#6e6e73;transition:all .15s}
+.chart-tab.active{background:#5e17eb;border-color:#5e17eb;color:#fff}
+/* Auto-refresh */
+.btn-refresh{padding:7px 14px;background:#f5f5f7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#3a3a3c;transition:background .2s}
+.btn-refresh:hover{background:#e5e5ea}
+.btn-refresh.on{background:#e8f9ee;color:#1a7f3c}
+/* Export */
+.btn-export{padding:8px 14px;background:#f5f5f7;color:#3a3a3c;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s;white-space:nowrap}
+.btn-export:hover{background:#e5e5ea}
 @media(max-width:700px){
   .stats{grid-template-columns:repeat(2,1fr)}
   .search{width:130px}
   td,th{padding:10px 10px}
   .actions{flex-direction:column;gap:4px}
   .table-header-right{flex-wrap:wrap}
+  .chart-tabs{display:none}
 }
 </style>
 </head>
@@ -755,6 +784,7 @@ tr:hover td{background:#fafafa}
     </div>
     <div class="topbar-right">
       <span id="lastUpdate" style="font-size:12px;color:#aeaeb2"></span>
+      <button class="btn-refresh" id="btnRefresh" onclick="toggleAutoRefresh()">⟳ Auto</button>
       <button class="btn-logout" onclick="sair()">Sair</button>
     </div>
   </div>
@@ -765,10 +795,25 @@ tr:hover td{background:#fafafa}
       <div class="stat"><div class="stat-label">Cortesias</div><div class="stat-value laranja" id="sCortesias">—</div></div>
       <div class="stat"><div class="stat-label">Aguardando</div><div class="stat-value amarelo" id="sAguardando">—</div></div>
     </div>
+    <div class="chart-card">
+      <div class="chart-top">
+        <div>
+          <div class="chart-title">Crescimento de cadastros</div>
+          <div class="chart-sub">Últimos 30 dias</div>
+        </div>
+        <div class="chart-tabs">
+          <span class="chart-tab active" data-periodo="30" onclick="setPeriodo(this)">30d</span>
+          <span class="chart-tab" data-periodo="7" onclick="setPeriodo(this)">7d</span>
+        </div>
+      </div>
+      <div id="graficoWrap" style="min-height:100px"><div class="loading" style="padding:30px">Carregando...</div></div>
+    </div>
+
     <div class="table-card">
       <div class="table-header">
         <h2>Compradores</h2>
         <div class="table-header-right">
+          <button class="btn-export" onclick="exportarCSV()">⬇ CSV</button>
           <button class="btn-add" onclick="abrirModal()">+ Cortesia</button>
           <input class="search" type="text" id="search" placeholder="Buscar e-mail..." oninput="atualizar()">
         </div>
@@ -814,6 +859,7 @@ function entrar() {
       document.getElementById('loginWrap').style.display = 'none';
       document.getElementById('dash').style.display = 'flex';
       processar(data);
+      carregarGrafico();
     })
     .catch(() => { document.getElementById('loginErr').textContent = '❌ Chave incorreta.'; });
 }
@@ -978,6 +1024,121 @@ async function darCortesia() {
   }
 }
 
+// --- CSV Export ---
+function exportarCSV() {
+  const header = ['E-mail','Tipo','Ativacao','Status','Data'];
+  const rows = dados.map(d => [
+    d.email,
+    d.fonte === 'cortesia' ? 'Cortesia' : 'Compra',
+    d.ativado ? 'Ativado' : 'Aguardando',
+    d.ativo ? 'Ativo' : 'Revogado',
+    d.criado_em ? new Date(d.criado_em).toLocaleDateString('pt-BR') : ''
+  ]);
+  const csv = [header, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'baixaragora-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+// --- Auto-refresh ---
+let refreshTimer = null;
+let refreshCountdown = 60;
+function toggleAutoRefresh() {
+  const btn = document.getElementById('btnRefresh');
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+    btn.textContent = '⟳ Auto';
+    btn.classList.remove('on');
+  } else {
+    refreshCountdown = 60;
+    btn.textContent = '⟳ 60s';
+    btn.classList.add('on');
+    refreshTimer = setInterval(() => {
+      refreshCountdown--;
+      btn.textContent = '⟳ ' + refreshCountdown + 's';
+      if (refreshCountdown <= 0) {
+        refreshCountdown = 60;
+        recarregar();
+        carregarGrafico();
+      }
+    }, 1000);
+  }
+}
+
+// --- Gráfico de crescimento ---
+let graficoDados = [];
+let periodoDias = 30;
+
+function carregarGrafico() {
+  fetch('/admin/stats/crescimento', {headers:{'X-Admin-Key': adminKey}})
+    .then(r => r.json())
+    .then(data => { graficoDados = data; desenharGrafico(periodoDias); })
+    .catch(() => {});
+}
+
+function setPeriodo(el) {
+  periodoDias = parseInt(el.dataset.periodo);
+  document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  desenharGrafico(periodoDias);
+}
+
+function desenharGrafico(dias) {
+  const wrap = document.getElementById('graficoWrap');
+  // Build full date range for the period
+  const hoje = new Date();
+  const mapa = {};
+  graficoDados.forEach(p => { mapa[p.dia] = p.total; });
+  const pontos = [];
+  for (let i = dias - 1; i >= 0; i--) {
+    const d = new Date(hoje);
+    d.setDate(d.getDate() - i);
+    const chave = d.toISOString().slice(0,10);
+    pontos.push({dia: chave, label: d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}), total: mapa[chave] || 0});
+  }
+  const maxVal = Math.max(...pontos.map(p => p.total), 1);
+  const n = pontos.length;
+  const W = 560, H = 110;
+  const pL = 36, pR = 16, pT = 12, pB = 28;
+  const cw = W - pL - pR, ch = H - pT - pB;
+  const xp = i => pL + (n > 1 ? (i / (n-1)) * cw : cw/2);
+  const yp = v => pT + ch - (v / maxVal) * ch;
+  const linePoints = pontos.map((p,i) => xp(i)+','+yp(p.total)).join(' ');
+  const areaPoints = pL+','+(pT+ch)+' '+linePoints+' '+(pL+cw)+','+(pT+ch);
+  // X labels: show ~5 evenly spaced
+  const step = Math.max(1, Math.floor(n / 5));
+  const xLabels = pontos.map((p,i) => {
+    if (i % step !== 0 && i !== n-1) return '';
+    return `<text x="${xp(i)}" y="${H-4}" text-anchor="middle" font-size="9.5" fill="#aeaeb2">${p.label}</text>`;
+  }).join('');
+  // Y labels
+  const yTicks = [0, Math.round(maxVal/2), maxVal].filter((v,i,a) => a.indexOf(v)===i);
+  const yLabels = yTicks.map(v =>
+    `<text x="${pL-5}" y="${yp(v)+4}" text-anchor="end" font-size="9.5" fill="#aeaeb2">${v}</text>`
+  ).join('');
+  // Dots with tooltips
+  const dots = pontos.map((p,i) => p.total > 0
+    ? `<circle cx="${xp(i)}" cy="${yp(p.total)}" r="3.5" fill="#5e17eb"><title>${p.dia}: ${p.total} cadastro${p.total!==1?'s':''}</title></circle>`
+    : '').join('');
+  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">
+    <defs>
+      <linearGradient id="grad2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#5e17eb" stop-opacity="0.12"/>
+        <stop offset="100%" stop-color="#5e17eb" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <line x1="${pL}" y1="${pT}" x2="${pL}" y2="${pT+ch}" stroke="#f0f0f5" stroke-width="1"/>
+    <line x1="${pL}" y1="${pT+ch}" x2="${pL+cw}" y2="${pT+ch}" stroke="#f0f0f5" stroke-width="1"/>
+    <polygon points="${areaPoints}" fill="url(#grad2)"/>
+    <polyline points="${linePoints}" fill="none" stroke="#5e17eb" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}${xLabels}${yLabels}
+  </svg>`;
+}
+
+// --- Init ---
 const saved = sessionStorage.getItem('admin_key');
 if (saved) { document.getElementById('loginKey').value = saved; entrar(); }
 </script>
