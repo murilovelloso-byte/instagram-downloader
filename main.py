@@ -1072,8 +1072,8 @@ async function darCortesia() {
 function exportarCSV() {
   const h=['E-mail','Tipo','Ativacao','Status','Data'];
   const r=dados.map(d=>[d.email,d.fonte==='cortesia'?'Cortesia':'Compra',d.ativado?'Ativado':'Aguardando',d.ativo?'Ativo':'Revogado',d.criado_em?new Date(d.criado_em).toLocaleDateString('pt-BR'):'']);
-  const csv=[h,...r].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+  const csv=[h,...r].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\\n');
+  const blob=new Blob(['\\ufeff'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='baixaragora-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
 let refreshTimer=null, refreshCountdown=60;
