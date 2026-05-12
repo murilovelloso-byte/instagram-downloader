@@ -10,8 +10,9 @@ from urllib.parse import urlparse, unquote
 import httpx
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 import yt_dlp
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -42,44 +43,55 @@ SUPPORTED_URL_PATTERN = re.compile(
 
 # --- Database ---
 
+_pool: psycopg2.pool.ThreadedConnectionPool | None = None
 
-def get_db():
-    r = urlparse(DATABASE_URL)
-    conn = psycopg2.connect(
-        host=r.hostname,
-        port=r.port or 5432,
-        user=unquote(r.username or ""),
-        password=unquote(r.password or ""),
-        dbname=(r.path or "/postgres").lstrip("/"),
-        sslmode="require",
-    )
-    return conn
+
+def get_pool() -> psycopg2.pool.ThreadedConnectionPool:
+    global _pool
+    if _pool is None:
+        r = urlparse(DATABASE_URL)
+        _pool = psycopg2.pool.ThreadedConnectionPool(
+            minconn=1, maxconn=5,
+            host=r.hostname, port=r.port or 5432,
+            user=unquote(r.username or ""),
+            password=unquote(r.password or ""),
+            dbname=(r.path or "/postgres").lstrip("/"),
+            sslmode="require",
+        )
+    return _pool
 
 
 def db_fetchone(query: str, params: tuple = ()):
-    conn = get_db()
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(query, params)
-        row = cur.fetchone()
-    conn.close()
-    return row
+    pool = get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(query, params)
+            return cur.fetchone()
+    finally:
+        pool.putconn(conn)
 
 
 def db_fetchall(query: str, params: tuple = ()):
-    conn = get_db()
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(query, params)
-        rows = cur.fetchall()
-    conn.close()
-    return rows
+    pool = get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(query, params)
+            return cur.fetchall()
+    finally:
+        pool.putconn(conn)
 
 
 def db_execute(query: str, params: tuple = ()):
-    conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute(query, params)
-    conn.commit()
-    conn.close()
+    pool = get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+        conn.commit()
+    finally:
+        pool.putconn(conn)
 
 
 def init_db():
@@ -575,7 +587,7 @@ async def list_compradores(x_admin_key: str = Header(None)):
 
 
 @app.post("/webhook/kiwify")
-async def webhook_kiwify(payload: dict):
+async def webhook_kiwify(payload: dict, background_tasks: BackgroundTasks):
     token = payload.get("token", "")
     if KIWIFY_TOKEN and token != KIWIFY_TOKEN:
         raise HTTPException(status_code=403, detail="Token inválido.")
@@ -588,7 +600,6 @@ async def webhook_kiwify(payload: dict):
 
     customer = payload.get("Customer") or payload.get("customer") or {}
     email = (customer.get("email") or "").lower().strip()
-    name = customer.get("name") or ""
 
     if not email:
         raise HTTPException(status_code=400, detail="E-mail do comprador não encontrado.")
@@ -623,11 +634,7 @@ async def webhook_kiwify(payload: dict):
       <p style="color:#aeaeb2;font-size:12px;margin-top:24px;border-top:1px solid #f0f0f0;padding-top:16px">Dúvidas? Fale com a gente: <a href="mailto:suporte@baixaragora.com.br" style="color:#5e17eb;text-decoration:none">suporte@baixaragora.com.br</a></p>
     </div>
     """
-    try:
-        send_email(email, f"Código de ativação Baixar Agora: {codigo}", html_body)
-    except Exception:
-        pass
-
+    background_tasks.add_task(send_email, email, f"Código de ativação Baixar Agora: {codigo}", html_body)
     return {"ok": True, "email": email}
 
 
