@@ -95,35 +95,38 @@ def db_execute(query: str, params: tuple = ()):
 
 
 def init_db():
-    conn = get_db()
-    with conn.cursor() as cur:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS compradores (
-                email TEXT PRIMARY KEY,
-                ativo INTEGER DEFAULT 1,
-                criado_em TIMESTAMPTZ DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS chaves (
-                email TEXT PRIMARY KEY,
-                chave TEXT UNIQUE NOT NULL,
-                criado_em TIMESTAMPTZ DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS temp_codigos (
-                email TEXT PRIMARY KEY,
-                codigo TEXT NOT NULL,
-                expira_em TIMESTAMPTZ NOT NULL,
-                token TEXT UNIQUE
-            )
-        """)
-        cur.execute("""
-            ALTER TABLE temp_codigos ADD COLUMN IF NOT EXISTS token TEXT UNIQUE
-        """)
-    conn.commit()
-    conn.close()
+    pool = get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS compradores (
+                    email TEXT PRIMARY KEY,
+                    ativo INTEGER DEFAULT 1,
+                    criado_em TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chaves (
+                    email TEXT PRIMARY KEY,
+                    chave TEXT UNIQUE NOT NULL,
+                    criado_em TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS temp_codigos (
+                    email TEXT PRIMARY KEY,
+                    codigo TEXT NOT NULL,
+                    expira_em TIMESTAMPTZ NOT NULL,
+                    token TEXT UNIQUE
+                )
+            """)
+            cur.execute("""
+                ALTER TABLE temp_codigos ADD COLUMN IF NOT EXISTS token TEXT UNIQUE
+            """)
+        conn.commit()
+    finally:
+        pool.putconn(conn)
 
 
 init_db()
