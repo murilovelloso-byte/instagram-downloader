@@ -740,12 +740,16 @@ tr:hover td{background:#fafafa}
 .btn-confirm:hover{opacity:.85}
 /* Chart */
 .chart-card{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.05);padding:20px 24px 16px;margin-bottom:28px}
-.chart-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.chart-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
 .chart-title{font-size:15px;font-weight:700;color:#1d1d1f}
-.chart-sub{font-size:12px;color:#aeaeb2;margin-top:2px}
+.chart-sub{font-size:12px;color:#aeaeb2;margin-top:2px;margin-bottom:14px}
 .chart-tabs{display:flex;gap:6px}
 .chart-tab{padding:4px 12px;border:1.5px solid #e5e5ea;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#6e6e73;transition:all .15s}
 .chart-tab.active{background:#5e17eb;border-color:#5e17eb;color:#fff}
+@keyframes drawLine{to{stroke-dashoffset:0}}
+.chart-tip{position:absolute;background:#1d1d1f;color:#fff;border-radius:10px;padding:9px 14px;font-size:12px;pointer-events:none;white-space:nowrap;transform:translateX(-50%);z-index:20;display:none}
+.chart-tip-date{color:#a0a0ab;font-size:11px;margin-bottom:3px}
+.chart-tip-val{font-weight:700;font-size:15px}
 /* Auto-refresh */
 .btn-refresh{padding:7px 14px;background:#f5f5f7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#3a3a3c;transition:background .2s}
 .btn-refresh:hover{background:#e5e5ea}
@@ -799,14 +803,14 @@ tr:hover td{background:#fafafa}
       <div class="chart-top">
         <div>
           <div class="chart-title">Crescimento de cadastros</div>
-          <div class="chart-sub">Últimos 30 dias</div>
         </div>
         <div class="chart-tabs">
           <span class="chart-tab active" data-periodo="30" onclick="setPeriodo(this)">30d</span>
           <span class="chart-tab" data-periodo="7" onclick="setPeriodo(this)">7d</span>
         </div>
       </div>
-      <div id="graficoWrap" style="min-height:100px"><div class="loading" style="padding:30px">Carregando...</div></div>
+      <div class="chart-sub" id="chartSub">Carregando...</div>
+      <div id="graficoWrap" style="min-height:120px;position:relative"><div class="loading" style="padding:30px">Carregando...</div></div>
     </div>
 
     <div class="table-card">
@@ -1088,7 +1092,6 @@ function setPeriodo(el) {
 
 function desenharGrafico(dias) {
   const wrap = document.getElementById('graficoWrap');
-  // Build full date range for the period
   const hoje = new Date();
   const mapa = {};
   graficoDados.forEach(p => { mapa[p.dia] = p.total; });
@@ -1099,43 +1102,116 @@ function desenharGrafico(dias) {
     const chave = d.toISOString().slice(0,10);
     pontos.push({dia: chave, label: d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}), total: mapa[chave] || 0});
   }
-  const maxVal = Math.max(...pontos.map(p => p.total), 1);
   const n = pontos.length;
-  const W = 560, H = 110;
-  const pL = 36, pR = 16, pT = 12, pB = 28;
+  const maxVal = Math.max(...pontos.map(p => p.total), 1);
+  const total = pontos.reduce((s,p) => s + p.total, 0);
+  document.getElementById('chartSub').textContent = total + ' cadastro' + (total !== 1 ? 's' : '') + ' nos últimos ' + dias + ' dias';
+
+  const W = 580, H = 150;
+  const pL = 38, pR = 16, pT = 14, pB = 30;
   const cw = W - pL - pR, ch = H - pT - pB;
-  const xp = i => pL + (n > 1 ? (i / (n-1)) * cw : cw/2);
+  const xp = i => pL + (n > 1 ? (i / (n-1)) * cw : cw / 2);
   const yp = v => pT + ch - (v / maxVal) * ch;
-  const linePoints = pontos.map((p,i) => xp(i)+','+yp(p.total)).join(' ');
-  const areaPoints = pL+','+(pT+ch)+' '+linePoints+' '+(pL+cw)+','+(pT+ch);
-  // X labels: show ~5 evenly spaced
-  const step = Math.max(1, Math.floor(n / 5));
-  const xLabels = pontos.map((p,i) => {
-    if (i % step !== 0 && i !== n-1) return '';
-    return `<text x="${xp(i)}" y="${H-4}" text-anchor="middle" font-size="9.5" fill="#aeaeb2">${p.label}</text>`;
-  }).join('');
-  // Y labels
-  const yTicks = [0, Math.round(maxVal/2), maxVal].filter((v,i,a) => a.indexOf(v)===i);
-  const yLabels = yTicks.map(v =>
-    `<text x="${pL-5}" y="${yp(v)+4}" text-anchor="end" font-size="9.5" fill="#aeaeb2">${v}</text>`
+
+  // Smooth bezier path
+  function bezier(pts) {
+    if (!pts.length) return '';
+    if (pts.length === 1) return `M ${pts[0].x},${pts[0].y}`;
+    let d = `M ${pts[0].x},${pts[0].y}`;
+    for (let i = 1; i < pts.length; i++) {
+      const mx = (pts[i-1].x + pts[i].x) / 2;
+      d += ` C ${mx},${pts[i-1].y} ${mx},${pts[i].y} ${pts[i].x},${pts[i].y}`;
+    }
+    return d;
+  }
+  const pts = pontos.map((p,i) => ({x: xp(i), y: yp(p.total)}));
+  const linePath = bezier(pts);
+  const areaPath = linePath + ` L ${xp(n-1)},${pT+ch} L ${xp(0)},${pT+ch} Z`;
+
+  // Horizontal grid lines
+  const gridTicks = [Math.ceil(maxVal*0.5), maxVal];
+  const gridSVG = gridTicks.map(v =>
+    `<line x1="${pL}" y1="${yp(v)}" x2="${pL+cw}" y2="${yp(v)}" stroke="#f0f0f5" stroke-width="1" stroke-dasharray="4,4"/>
+     <text x="${pL-6}" y="${yp(v)+4}" text-anchor="end" font-size="10" fill="#c7c7cc">${v}</text>`
   ).join('');
-  // Dots with tooltips
-  const dots = pontos.map((p,i) => p.total > 0
-    ? `<circle cx="${xp(i)}" cy="${yp(p.total)}" r="3.5" fill="#5e17eb"><title>${p.dia}: ${p.total} cadastro${p.total!==1?'s':''}</title></circle>`
-    : '').join('');
-  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">
+
+  // X labels (~5 evenly spaced)
+  const step = Math.max(1, Math.floor(n / 5));
+  const xSVG = pontos.map((p,i) => {
+    if (i % step !== 0 && i !== n-1) return '';
+    return `<text x="${xp(i)}" y="${H-4}" text-anchor="middle" font-size="10" fill="#c7c7cc">${p.label}</text>`;
+  }).join('');
+
+  // Dots (hidden, revealed on hover)
+  const dotSVG = pontos.map((p,i) =>
+    `<circle id="gd${i}" cx="${xp(i)}" cy="${yp(p.total)}" r="5" fill="#fff" stroke="#5e17eb" stroke-width="2.5" opacity="0" style="transition:opacity .12s"/>`
+  ).join('');
+
+  // Hit areas
+  const hw = Math.max(22, cw / n);
+  const hitSVG = pontos.map((p,i) =>
+    `<rect x="${xp(i)-hw/2}" y="${pT}" width="${hw}" height="${ch}" fill="transparent" style="cursor:crosshair" onmouseenter="showTip(event,${i},${xp(i).toFixed(1)},${yp(p.total).toFixed(1)})" onmouseleave="hideTip()"/>`
+  ).join('');
+
+  wrap.innerHTML = `
+  <div class="chart-tip" id="chartTip"><div class="chart-tip-date" id="tipDate"></div><div class="chart-tip-val" id="tipVal"></div></div>
+  <svg id="chartSvg" viewBox="0 0 ${W} ${H}" style="width:100%;display:block;overflow:visible">
     <defs>
-      <linearGradient id="grad2" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#5e17eb" stop-opacity="0.12"/>
-        <stop offset="100%" stop-color="#5e17eb" stop-opacity="0"/>
+      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#5e17eb" stop-opacity="0.18"/>
+        <stop offset="80%" stop-color="#5e17eb" stop-opacity="0.02"/>
       </linearGradient>
+      <clipPath id="cc"><rect x="${pL}" y="${pT-2}" width="${cw+2}" height="${ch+4}"/></clipPath>
     </defs>
-    <line x1="${pL}" y1="${pT}" x2="${pL}" y2="${pT+ch}" stroke="#f0f0f5" stroke-width="1"/>
-    <line x1="${pL}" y1="${pT+ch}" x2="${pL+cw}" y2="${pT+ch}" stroke="#f0f0f5" stroke-width="1"/>
-    <polygon points="${areaPoints}" fill="url(#grad2)"/>
-    <polyline points="${linePoints}" fill="none" stroke="#5e17eb" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-    ${dots}${xLabels}${yLabels}
+    ${gridSVG}
+    <line x1="${pL}" y1="${pT+ch}" x2="${pL+cw}" y2="${pT+ch}" stroke="#e5e5ea" stroke-width="1"/>
+    <line id="gvl" x1="0" y1="${pT}" x2="0" y2="${pT+ch}" stroke="#5e17eb" stroke-width="1.5" stroke-dasharray="4,3" opacity="0" style="transition:opacity .12s"/>
+    <g clip-path="url(#cc)">
+      <path d="${areaPath}" fill="url(#areaGrad)"/>
+      <path d="${linePath}" fill="none" stroke="#5e17eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+            stroke-dasharray="9999" stroke-dashoffset="9999" style="animation:drawLine .9s ease forwards"/>
+    </g>
+    ${dotSVG}${xSVG}${hitSVG}
   </svg>`;
+  window._gp = pontos;
+}
+
+function showTip(e, i, svgX, svgY) {
+  const svg = document.getElementById('chartSvg');
+  const wrap = document.getElementById('graficoWrap');
+  const tip = document.getElementById('chartTip');
+  const vl = document.getElementById('gvl');
+  const p = window._gp[i];
+  // Scale SVG units → CSS pixels relative to wrap
+  const sr = svg.getBoundingClientRect();
+  const wr = wrap.getBoundingClientRect();
+  const sx = sr.width / 580;
+  const sy = sr.height / 150;
+  const px = (sr.left - wr.left) + svgX * sx;
+  const py = (sr.top - wr.top) + svgY * sy;
+  // Keep tooltip inside container
+  const half = 70;
+  tip.style.left = Math.max(half, Math.min(px, wr.width - half)) + 'px';
+  tip.style.top = Math.max(4, py - 58) + 'px';
+  tip.style.display = 'block';
+  document.getElementById('tipDate').textContent = p.label;
+  document.getElementById('tipVal').textContent = p.total + (p.total === 1 ? ' cadastro' : ' cadastros');
+  vl.setAttribute('x1', svgX); vl.setAttribute('x2', svgX); vl.setAttribute('opacity', '0.35');
+  window._gp.forEach((_,j) => {
+    const d = document.getElementById('gd'+j);
+    if (d) d.setAttribute('opacity', j===i ? '1' : '0');
+  });
+}
+
+function hideTip() {
+  const tip = document.getElementById('chartTip');
+  const vl = document.getElementById('gvl');
+  if (tip) tip.style.display = 'none';
+  if (vl) vl.setAttribute('opacity','0');
+  (window._gp||[]).forEach((_,j) => {
+    const d = document.getElementById('gd'+j);
+    if (d) d.setAttribute('opacity','0');
+  });
 }
 
 // --- Init ---
