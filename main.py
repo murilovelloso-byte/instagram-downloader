@@ -1054,7 +1054,7 @@ async function revogar(email) {
 }
 async function reativar(email) { await fetch('/admin/reativar/'+encodeURIComponent(email),{method:'POST',headers:{'X-Admin-Key':adminKey}}); recarregar(); }
 async function excluir(email) {
-  if(!confirm('Excluir permanentemente "'+email+'"?\n\nEssa ação remove o usuário, a chave de ativação e todos os dados. Não pode ser desfeita.')) return;
+  if(!confirm('Excluir permanentemente "'+email+'"? Isso remove o usuário, a chave de ativação e todos os dados. Ação irreversível.')) return;
   await fetch('/admin/comprador/'+encodeURIComponent(email)+'/permanente',{method:'DELETE',headers:{'X-Admin-Key':adminKey}});
   recarregar();
 }
