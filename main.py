@@ -560,6 +560,16 @@ async def revoke_comprador(email: str, x_admin_key: str = Header(None)):
     return {"ok": True, "email": email, "status": "revogado"}
 
 
+@app.delete("/admin/comprador/{email}/permanente")
+async def delete_comprador(email: str, x_admin_key: str = Header(None)):
+    require_admin(x_admin_key)
+    email = email.lower().strip()
+    db_execute("DELETE FROM temp_codigos WHERE email = %s", (email,))
+    db_execute("DELETE FROM chaves WHERE email = %s", (email,))
+    db_execute("DELETE FROM compradores WHERE email = %s", (email,))
+    return {"ok": True, "email": email, "status": "excluido"}
+
+
 @app.get("/admin/compradores")
 async def list_compradores(x_admin_key: str = Header(None)):
     require_admin(x_admin_key)
@@ -767,6 +777,7 @@ tbody tr:hover td{background:#fafbff}
 .ra-rev{background:#fef2f2;color:#dc2626}
 .ra-ati{background:#ecfdf5;color:#059669}
 .ra-env{background:#f3f0ff;color:#5e17eb}
+.ra-del{background:#fff1f2;color:#9f1239;border:1px solid #fecdd3}
 .tbl-empty{text-align:center;padding:48px;color:#94a3b8;font-size:14px}
 .tbl-load{text-align:center;padding:48px;color:#94a3b8}
 /* ── MODAL ── */
@@ -1022,7 +1033,10 @@ function renderTabela(lista) {
     const bt = d.ativo
       ? `<button class="ra ra-rev" onclick="revogar('${d.email}')">Revogar</button>`
       : `<button class="ra ra-ati" onclick="reativar('${d.email}')">Reativar</button>`;
-    return `<tr><td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.email}</td><td>${fb}</td><td>${ab}</td><td>${sb}</td><td style="color:#94a3b8;font-size:13px">${dt}</td><td><div class="row-acts">${bt}<button class="ra ra-env" onclick="reenviar(event,'${d.email}')">Reenviar</button></div></td></tr>`;
+    const delBtn = !d.ativo
+      ? `<button class="ra ra-del" onclick="excluir('${d.email}')">🗑 Excluir</button>`
+      : '';
+    return `<tr><td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.email}</td><td>${fb}</td><td>${ab}</td><td>${sb}</td><td style="color:#94a3b8;font-size:13px">${dt}</td><td><div class="row-acts">${bt}<button class="ra ra-env" onclick="reenviar(event,'${d.email}')">Reenviar</button>${delBtn}</div></td></tr>`;
   }).join('');
   wrap.innerHTML = `<table><thead><tr><th>E-mail</th><th>Tipo</th><th>Ativação</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -1039,6 +1053,11 @@ async function revogar(email) {
   recarregar();
 }
 async function reativar(email) { await fetch('/admin/reativar/'+encodeURIComponent(email),{method:'POST',headers:{'X-Admin-Key':adminKey}}); recarregar(); }
+async function excluir(email) {
+  if(!confirm('Excluir permanentemente "'+email+'"?\n\nEssa ação remove o usuário, a chave de ativação e todos os dados. Não pode ser desfeita.')) return;
+  await fetch('/admin/comprador/'+encodeURIComponent(email)+'/permanente',{method:'DELETE',headers:{'X-Admin-Key':adminKey}});
+  recarregar();
+}
 async function reenviar(e,email) {
   const btn=e.target; btn.textContent='...'; btn.disabled=true;
   await fetch('/admin/reenviar/'+encodeURIComponent(email),{method:'POST',headers:{'X-Admin-Key':adminKey}});
