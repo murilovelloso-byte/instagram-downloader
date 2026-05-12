@@ -1034,7 +1034,7 @@ function exportarCSV() {
     d.ativo ? 'Ativo' : 'Revogado',
     d.criado_em ? new Date(d.criado_em).toLocaleDateString('pt-BR') : ''
   ]);
-  const csv = [header, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const csv = [header, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\\n');
   const blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
