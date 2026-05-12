@@ -564,9 +564,35 @@ async def revoke_comprador(email: str, x_admin_key: str = Header(None)):
 async def list_compradores(x_admin_key: str = Header(None)):
     require_admin(x_admin_key)
     rows = db_fetchall(
-        "SELECT email, ativo, fonte, criado_em FROM compradores ORDER BY criado_em DESC"
+        """SELECT c.email, c.ativo, c.fonte, c.criado_em,
+                  CASE WHEN k.chave IS NOT NULL THEN true ELSE false END as ativado
+           FROM compradores c
+           LEFT JOIN chaves k ON c.email = k.email
+           ORDER BY c.criado_em DESC"""
     )
     return [dict(r) for r in rows]
+
+
+class PatchCompradorRequest(BaseModel):
+    fonte: str
+
+
+@app.patch("/admin/comprador/{email}")
+async def patch_comprador(email: str, body: PatchCompradorRequest, x_admin_key: str = Header(None)):
+    require_admin(x_admin_key)
+    email = email.lower().strip()
+    if body.fonte not in ("compra", "cortesia"):
+        raise HTTPException(status_code=400, detail="fonte deve ser 'compra' ou 'cortesia'")
+    db_execute("UPDATE compradores SET fonte = %s WHERE email = %s", (body.fonte, email))
+    return {"ok": True, "email": email, "fonte": body.fonte}
+
+
+@app.post("/admin/reativar/{email}")
+async def reativar_comprador(email: str, x_admin_key: str = Header(None)):
+    require_admin(x_admin_key)
+    email = email.lower().strip()
+    db_execute("UPDATE compradores SET ativo = 1 WHERE email = %s", (email,))
+    return {"ok": True, "email": email}
 
 
 @app.post("/admin/reenviar/{email}")
@@ -624,7 +650,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f0f5;min-height:100vh;color:#1d1d1f}
-/* Login */
 .login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:linear-gradient(135deg,#f0f7e0 0%,#f0f0f5 60%)}
 .login-card{background:#fff;border-radius:20px;padding:40px;max-width:380px;width:100%;box-shadow:0 4px 30px rgba(0,0,0,.08);text-align:center}
 .login-card img{width:64px;height:64px;border-radius:14px;margin-bottom:16px}
@@ -635,7 +660,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .login-card button{width:100%;padding:13px;background:#5e17eb;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:opacity .2s}
 .login-card button:hover{opacity:.85}
 .login-err{color:#ff3b30;font-size:13px;margin-top:10px}
-/* Dashboard */
 .dash{display:none;flex-direction:column;min-height:100vh}
 .topbar{background:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e5ea;position:sticky;top:0;z-index:10}
 .topbar-left{display:flex;align-items:center;gap:12px}
@@ -644,33 +668,42 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .topbar-right{display:flex;align-items:center;gap:12px}
 .btn-logout{padding:7px 14px;background:#f5f5f7;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#3a3a3c}
 .btn-logout:hover{background:#e5e5ea}
-.content{padding:24px;max-width:1100px;margin:0 auto;width:100%}
-/* Stats */
+.content{padding:24px;max-width:1200px;margin:0 auto;width:100%}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
 .stat{background:#fff;border-radius:16px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.05)}
 .stat-label{font-size:12px;font-weight:600;color:#aeaeb2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
 .stat-value{font-size:32px;font-weight:700;color:#1d1d1f}
-.stat-value.verde{color:#5c9e00}
 .stat-value.roxo{color:#5e17eb}
-.stat-value.vermelho{color:#ff3b30}
 .stat-value.laranja{color:#ff9500}
-/* Tabela */
+.stat-value.vermelho{color:#ff3b30}
+.stat-value.amarelo{color:#a36200}
 .table-card{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.05);overflow:hidden}
-.table-header{padding:18px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f0f5}
+.table-header{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f0f5;gap:12px;flex-wrap:wrap}
 .table-header h2{font-size:16px;font-weight:700}
-.search{padding:8px 14px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:14px;outline:none;width:220px;transition:border-color .2s}
+.table-header-right{display:flex;align-items:center;gap:10px}
+.btn-add{padding:8px 16px;background:#5e17eb;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .2s;white-space:nowrap}
+.btn-add:hover{opacity:.85}
+.search{padding:8px 14px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:14px;outline:none;width:200px;transition:border-color .2s}
 .search:focus{border-color:#5e17eb}
+.filters{display:flex;gap:8px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid #f0f0f5;background:#fafafa}
+.pill{padding:5px 14px;border:1.5px solid #e5e5ea;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;background:#fff;color:#6e6e73;transition:all .15s;user-select:none}
+.pill.active{background:#5e17eb;border-color:#5e17eb;color:#fff}
+.pill:hover:not(.active){border-color:#5e17eb;color:#5e17eb}
 table{width:100%;border-collapse:collapse}
 th{text-align:left;padding:11px 16px;font-size:12px;font-weight:600;color:#aeaeb2;text-transform:uppercase;letter-spacing:.5px;background:#fafafa;border-bottom:1px solid #f0f0f5}
-td{padding:13px 16px;font-size:14px;border-bottom:1px solid #f5f5f7;vertical-align:middle}
+td{padding:12px 16px;font-size:14px;border-bottom:1px solid #f5f5f7;vertical-align:middle}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:#fafafa}
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
 .badge-ativo{background:#e8f9ee;color:#1a7f3c}
 .badge-revogado{background:#ffeef0;color:#c0392b}
 .badge-compra{background:#ede8fb;color:#5e17eb}
-.badge-cortesia{background:#fff3e0;color:#e67e22}
-.actions{display:flex;gap:8px}
+.badge-cortesia{background:#fff3e0;color:#b35c00}
+.badge-ativado{background:#e8f9ee;color:#1a7f3c}
+.badge-aguardando{background:#fff8e0;color:#a36200}
+.badge-tipo{cursor:pointer;transition:opacity .15s}
+.badge-tipo:hover{opacity:.7}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
 .btn{padding:6px 12px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:opacity .2s;white-space:nowrap}
 .btn:hover{opacity:.8}
 .btn-revogar{background:#ffeef0;color:#c0392b}
@@ -678,17 +711,31 @@ tr:hover td{background:#fafafa}
 .btn-reenviar{background:#ede8fb;color:#5e17eb}
 .empty{text-align:center;padding:40px;color:#aeaeb2;font-size:14px}
 .loading{text-align:center;padding:40px;color:#aeaeb2}
+/* Modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;padding:20px}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:20px;padding:32px;max-width:380px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.15)}
+.modal h2{font-size:20px;font-weight:700;margin-bottom:8px}
+.modal p{color:#6e6e73;font-size:14px;margin-bottom:20px}
+.modal input{width:100%;padding:13px 16px;border:1.5px solid #d2d2d7;border-radius:12px;font-size:16px;outline:none;margin-bottom:8px;transition:border-color .2s}
+.modal input:focus{border-color:#5e17eb}
+.modal-msg{font-size:13px;min-height:18px;margin-bottom:12px}
+.modal-btns{display:flex;gap:10px}
+.modal-btns button{flex:1;padding:13px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s}
+.btn-cancel{background:#f5f5f7;color:#3a3a3c}
+.btn-confirm{background:#5e17eb;color:#fff}
+.btn-confirm:hover{opacity:.85}
 @media(max-width:700px){
   .stats{grid-template-columns:repeat(2,1fr)}
-  .search{width:140px}
+  .search{width:130px}
   td,th{padding:10px 10px}
   .actions{flex-direction:column;gap:4px}
+  .table-header-right{flex-wrap:wrap}
 }
 </style>
 </head>
 <body>
 
-<!-- LOGIN -->
 <div class="login-wrap" id="loginWrap">
   <div class="login-card">
     <img src="/static/icone.png" alt="Baixar Agora">
@@ -700,7 +747,6 @@ tr:hover td{background:#fafafa}
   </div>
 </div>
 
-<!-- DASHBOARD -->
 <div class="dash" id="dash">
   <div class="topbar">
     <div class="topbar-left">
@@ -714,17 +760,40 @@ tr:hover td{background:#fafafa}
   </div>
   <div class="content">
     <div class="stats">
-      <div class="stat"><div class="stat-label">Total</div><div class="stat-value" id="sTotal">—</div></div>
-      <div class="stat"><div class="stat-label">Ativos</div><div class="stat-value verde" id="sAtivos">—</div></div>
-      <div class="stat"><div class="stat-label">Revogados</div><div class="stat-value vermelho" id="sRevogados">—</div></div>
+      <div class="stat"><div class="stat-label">Total Ativo</div><div class="stat-value" id="sTotal">—</div></div>
+      <div class="stat"><div class="stat-label">Compras</div><div class="stat-value roxo" id="sCompras">—</div></div>
       <div class="stat"><div class="stat-label">Cortesias</div><div class="stat-value laranja" id="sCortesias">—</div></div>
+      <div class="stat"><div class="stat-label">Aguardando</div><div class="stat-value amarelo" id="sAguardando">—</div></div>
     </div>
     <div class="table-card">
       <div class="table-header">
         <h2>Compradores</h2>
-        <input class="search" type="text" id="search" placeholder="Buscar e-mail..." oninput="filtrar()">
+        <div class="table-header-right">
+          <button class="btn-add" onclick="abrirModal()">+ Cortesia</button>
+          <input class="search" type="text" id="search" placeholder="Buscar e-mail..." oninput="atualizar()">
+        </div>
+      </div>
+      <div class="filters" id="filtersBar">
+        <span class="pill active" data-filtro="todos" onclick="setFiltro(this)">Todos</span>
+        <span class="pill" data-filtro="compra" onclick="setFiltro(this)">Compra</span>
+        <span class="pill" data-filtro="cortesia" onclick="setFiltro(this)">Cortesia</span>
+        <span class="pill" data-filtro="aguardando" onclick="setFiltro(this)">Aguardando</span>
+        <span class="pill" data-filtro="revogado" onclick="setFiltro(this)">Revogado</span>
       </div>
       <div id="tableWrap"><div class="loading">Carregando...</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h2>🎁 Dar Cortesia</h2>
+    <p>Digite o e-mail para liberar acesso gratuito e enviar o link de ativação.</p>
+    <input type="email" id="modalEmail" placeholder="email@exemplo.com">
+    <p class="modal-msg" id="modalMsg"></p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-confirm" id="modalBtn" onclick="darCortesia()">Liberar</button>
     </div>
   </div>
 </div>
@@ -732,15 +801,13 @@ tr:hover td{background:#fafafa}
 <script>
 let dados = [];
 let adminKey = '';
+let filtroAtivo = 'todos';
 
 function entrar() {
   const key = document.getElementById('loginKey').value.trim();
   if (!key) return;
   fetch('/admin/compradores', {headers:{'X-Admin-Key': key}})
-    .then(r => {
-      if (!r.ok) throw new Error('negado');
-      return r.json();
-    })
+    .then(r => { if (!r.ok) throw new Error(); return r.json(); })
     .then(data => {
       adminKey = key;
       sessionStorage.setItem('admin_key', key);
@@ -748,69 +815,95 @@ function entrar() {
       document.getElementById('dash').style.display = 'flex';
       processar(data);
     })
-    .catch(() => {
-      document.getElementById('loginErr').textContent = '❌ Chave incorreta.';
-    });
+    .catch(() => { document.getElementById('loginErr').textContent = '❌ Chave incorreta.'; });
 }
 
 document.getElementById('loginKey').addEventListener('keydown', e => { if(e.key==='Enter') entrar(); });
 
-function sair() {
-  sessionStorage.removeItem('admin_key');
-  location.reload();
-}
+function sair() { sessionStorage.removeItem('admin_key'); location.reload(); }
 
 function processar(data) {
   dados = data;
-  const total = data.length;
   const ativos = data.filter(d => d.ativo).length;
-  const revogados = total - ativos;
-  const cortesias = data.filter(d => d.fonte === 'cortesia').length;
-  document.getElementById('sTotal').textContent = total;
-  document.getElementById('sAtivos').textContent = ativos;
-  document.getElementById('sRevogados').textContent = revogados;
+  const compras = data.filter(d => d.fonte === 'compra' && d.ativo).length;
+  const cortesias = data.filter(d => d.fonte === 'cortesia' && d.ativo).length;
+  const aguardando = data.filter(d => d.ativo && !d.ativado).length;
+  document.getElementById('sTotal').textContent = ativos;
+  document.getElementById('sCompras').textContent = compras;
   document.getElementById('sCortesias').textContent = cortesias;
-  const now = new Date();
-  document.getElementById('lastUpdate').textContent = 'Atualizado ' + now.toLocaleTimeString('pt-BR');
-  renderTabela(data);
+  document.getElementById('sAguardando').textContent = aguardando;
+  document.getElementById('lastUpdate').textContent = 'Atualizado ' + new Date().toLocaleTimeString('pt-BR');
+  renderTabela(getFiltrado());
 }
+
+function getFiltrado() {
+  const q = document.getElementById('search').value.toLowerCase();
+  return dados.filter(d => {
+    if (q && !d.email.toLowerCase().includes(q)) return false;
+    if (filtroAtivo === 'compra') return d.fonte === 'compra';
+    if (filtroAtivo === 'cortesia') return d.fonte === 'cortesia';
+    if (filtroAtivo === 'aguardando') return d.ativo && !d.ativado;
+    if (filtroAtivo === 'revogado') return !d.ativo;
+    return true;
+  });
+}
+
+function setFiltro(el) {
+  filtroAtivo = el.dataset.filtro;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  renderTabela(getFiltrado());
+}
+
+function atualizar() { renderTabela(getFiltrado()); }
 
 function renderTabela(lista) {
   const wrap = document.getElementById('tableWrap');
   if (!lista.length) { wrap.innerHTML = '<div class="empty">Nenhum resultado encontrado.</div>'; return; }
   const rows = lista.map(d => {
+    const novoTipo = d.fonte === 'cortesia' ? 'compra' : 'cortesia';
+    const novoLabel = d.fonte === 'cortesia' ? 'Compra' : 'Cortesia';
+    const fonteBadge = d.fonte === 'cortesia'
+      ? `<span class="badge badge-cortesia badge-tipo" title="Clique para mudar para Compra" onclick="mudarTipo('${d.email}','${novoTipo}','${novoLabel}')">Cortesia ✏️</span>`
+      : `<span class="badge badge-compra badge-tipo" title="Clique para mudar para Cortesia" onclick="mudarTipo('${d.email}','${novoTipo}','${novoLabel}')">Compra ✏️</span>`;
+    const ativacaoBadge = d.ativado
+      ? '<span class="badge badge-ativado">Ativado ✅</span>'
+      : '<span class="badge badge-aguardando">Aguardando ⏳</span>';
     const statusBadge = d.ativo
       ? '<span class="badge badge-ativo">Ativo</span>'
       : '<span class="badge badge-revogado">Revogado</span>';
-    const fonteBadge = d.fonte === 'cortesia'
-      ? '<span class="badge badge-cortesia">Cortesia</span>'
-      : '<span class="badge badge-compra">Compra</span>';
-    const data = d.criado_em ? new Date(d.criado_em).toLocaleDateString('pt-BR') : '—';
+    const dt = d.criado_em ? new Date(d.criado_em).toLocaleDateString('pt-BR') : '—';
     const btnToggle = d.ativo
       ? `<button class="btn btn-revogar" onclick="revogar('${d.email}')">Revogar</button>`
       : `<button class="btn btn-ativar" onclick="reativar('${d.email}')">Reativar</button>`;
     return `<tr>
-      <td>${d.email}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.email}</td>
       <td>${fonteBadge}</td>
+      <td>${ativacaoBadge}</td>
       <td>${statusBadge}</td>
-      <td>${data}</td>
-      <td><div class="actions">${btnToggle}<button class="btn btn-reenviar" onclick="reenviar('${d.email}')">Reenviar</button></div></td>
+      <td style="white-space:nowrap">${dt}</td>
+      <td><div class="actions">${btnToggle}<button class="btn btn-reenviar" onclick="reenviar(event,'${d.email}')">Reenviar</button></div></td>
     </tr>`;
   }).join('');
   wrap.innerHTML = `<table>
-    <thead><tr><th>E-mail</th><th>Tipo</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead>
+    <thead><tr><th>E-mail</th><th>Tipo</th><th>Ativação</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
-}
-
-function filtrar() {
-  const q = document.getElementById('search').value.toLowerCase();
-  renderTabela(dados.filter(d => d.email.toLowerCase().includes(q)));
 }
 
 function recarregar() {
   fetch('/admin/compradores', {headers:{'X-Admin-Key': adminKey}})
     .then(r => r.json()).then(processar);
+}
+
+async function mudarTipo(email, novoTipo, novoLabel) {
+  if (!confirm('Mudar tipo de "' + email + '" para ' + novoLabel + '?')) return;
+  await fetch('/admin/comprador/' + encodeURIComponent(email), {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json', 'X-Admin-Key': adminKey},
+    body: JSON.stringify({fonte: novoTipo})
+  });
+  recarregar();
 }
 
 async function revogar(email) {
@@ -820,12 +913,12 @@ async function revogar(email) {
 }
 
 async function reativar(email) {
-  await fetch('/admin/comprador', {method:'POST', headers:{'Content-Type':'application/json','X-Admin-Key': adminKey}, body: JSON.stringify({email})});
+  await fetch('/admin/reativar/' + encodeURIComponent(email), {method:'POST', headers:{'X-Admin-Key': adminKey}});
   recarregar();
 }
 
-async function reenviar(email) {
-  const btn = event.target;
+async function reenviar(e, email) {
+  const btn = e.target;
   btn.textContent = '...';
   btn.disabled = true;
   await fetch('/admin/reenviar/' + encodeURIComponent(email), {method:'POST', headers:{'X-Admin-Key': adminKey}});
@@ -833,12 +926,60 @@ async function reenviar(email) {
   setTimeout(() => { btn.textContent = 'Reenviar'; btn.disabled = false; }, 3000);
 }
 
-// Auto-login se tiver chave salva
-const saved = sessionStorage.getItem('admin_key');
-if (saved) {
-  document.getElementById('loginKey').value = saved;
-  entrar();
+function abrirModal() {
+  document.getElementById('modalEmail').value = '';
+  document.getElementById('modalMsg').textContent = '';
+  document.getElementById('modalMsg').style.color = '';
+  document.getElementById('modalBtn').disabled = false;
+  document.getElementById('modalBtn').textContent = 'Liberar';
+  document.getElementById('modalBg').classList.add('open');
+  setTimeout(() => document.getElementById('modalEmail').focus(), 100);
 }
+
+function fecharModal() {
+  document.getElementById('modalBg').classList.remove('open');
+}
+
+document.getElementById('modalBg').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalBg')) fecharModal();
+});
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModal(); });
+
+async function darCortesia() {
+  const email = document.getElementById('modalEmail').value.trim();
+  const msg = document.getElementById('modalMsg');
+  const btn = document.getElementById('modalBtn');
+  if (!email) return;
+  btn.disabled = true;
+  btn.textContent = 'Liberando...';
+  try {
+    const res = await fetch('/admin/comprador', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Admin-Key': adminKey},
+      body: JSON.stringify({email})
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.style.color = '#30d158';
+      msg.textContent = '✅ Acesso liberado! E-mail de ativação enviado.';
+      setTimeout(() => { fecharModal(); recarregar(); }, 1800);
+    } else {
+      msg.style.color = '#ff3b30';
+      msg.textContent = '❌ ' + (data.detail || 'Erro ao liberar.');
+      btn.disabled = false;
+      btn.textContent = 'Liberar';
+    }
+  } catch {
+    msg.style.color = '#ff3b30';
+    msg.textContent = '❌ Erro de conexão.';
+    btn.disabled = false;
+    btn.textContent = 'Liberar';
+  }
+}
+
+const saved = sessionStorage.getItem('admin_key');
+if (saved) { document.getElementById('loginKey').value = saved; entrar(); }
 </script>
 </body>
 </html>"""
