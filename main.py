@@ -172,7 +172,7 @@ ATIVAR_HTML = """<!DOCTYPE html>
   <link rel="apple-touch-icon" href="https://instagram-downloader-wgvm.onrender.com/static/icone.png">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f7;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#f0f7e0 0%,#f5f5f7 60%);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
     .card{background:#fff;border-radius:20px;padding:40px;max-width:420px;width:100%;box-shadow:0 4px 30px rgba(0,0,0,.08);text-align:center}
     .logo{width:72px;height:72px;border-radius:16px;margin:0 auto 20px;display:block}
     h1{font-size:24px;font-weight:700;color:#1d1d1f;margin-bottom:8px}
@@ -199,6 +199,7 @@ ATIVAR_HTML = """<!DOCTYPE html>
     <button type="submit" id="btn">Enviar código</button>
   </form>
   <p class="msg" id="msg"></p>
+  <p class="footer">Dúvidas? <a href="mailto:suporte@baixaragora.com.br">suporte@baixaragora.com.br</a></p>
 </div>
 <script>
 document.getElementById('form').addEventListener('submit', async e => {
@@ -233,8 +234,6 @@ document.getElementById('form').addEventListener('submit', async e => {
   }
 });
 </script>
-  <p class="footer">Dúvidas? <a href="mailto:suporte@baixaragora.com.br">suporte@baixaragora.com.br</a></p>
-</div>
 </body>
 </html>"""
 
