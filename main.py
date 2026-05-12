@@ -168,11 +168,13 @@ ATIVAR_HTML = """<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Baixar Agora — Ativação</title>
+  <link rel="icon" type="image/png" href="https://instagram-downloader-wgvm.onrender.com/static/icone.png">
+  <link rel="apple-touch-icon" href="https://instagram-downloader-wgvm.onrender.com/static/icone.png">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f7;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
     .card{background:#fff;border-radius:20px;padding:40px;max-width:420px;width:100%;box-shadow:0 4px 30px rgba(0,0,0,.08);text-align:center}
-    .icon{font-size:48px;margin-bottom:16px}
+    .logo{width:72px;height:72px;border-radius:16px;margin:0 auto 20px;display:block}
     h1{font-size:24px;font-weight:700;color:#1d1d1f;margin-bottom:8px}
     p{color:#6e6e73;font-size:15px;line-height:1.5;margin-bottom:24px}
     input{width:100%;padding:14px 16px;border:1.5px solid #d2d2d7;border-radius:12px;font-size:16px;outline:none;transition:border-color .2s;margin-bottom:12px}
@@ -183,11 +185,13 @@ ATIVAR_HTML = """<!DOCTYPE html>
     .msg{margin-top:16px;font-size:14px}
     .success{color:#30d158}
     .error{color:#ff3b30}
+    .footer{font-size:12px;color:#aeaeb2;margin-top:28px;border-top:1px solid #f0f0f0;padding-top:16px}
+    .footer a{color:#5e17eb;text-decoration:none}
   </style>
 </head>
 <body>
 <div class="card">
-  <div class="icon">⬇️</div>
+  <img class="logo" src="https://instagram-downloader-wgvm.onrender.com/static/icone.png" alt="Baixar Agora">
   <h1>Ativar Baixar Agora</h1>
   <p>Digite o e-mail usado na compra para receber seu código de ativação.</p>
   <form id="form">
@@ -229,6 +233,8 @@ document.getElementById('form').addEventListener('submit', async e => {
   }
 });
 </script>
+  <p class="footer">Dúvidas? <a href="mailto:suporte@baixaragora.com.br">suporte@baixaragora.com.br</a></p>
+</div>
 </body>
 </html>"""
 
@@ -240,32 +246,73 @@ def build_confirmar_html(chave: str) -> str:
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Baixar Agora — Ativado!</title>
+  <link rel="icon" type="image/png" href="{APP_URL}/static/icone.png">
+  <link rel="apple-touch-icon" href="{APP_URL}/static/icone.png">
   <style>
     *{{box-sizing:border-box;margin:0;padding:0}}
     body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f7;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}}
-    .card{{background:#fff;border-radius:20px;padding:40px;max-width:420px;width:100%;box-shadow:0 4px 30px rgba(0,0,0,.08);text-align:center}}
-    .icon{{font-size:48px;margin-bottom:16px}}
-    h1{{font-size:24px;font-weight:700;color:#1d1d1f;margin-bottom:8px}}
-    p{{color:#6e6e73;font-size:15px;line-height:1.5;margin-bottom:24px}}
-    .chave-box{{background:#f5f5f7;border-radius:12px;padding:16px;font-family:monospace;font-size:20px;font-weight:700;color:#5e17eb;letter-spacing:3px;margin-bottom:16px;word-break:break-all}}
-    button{{width:100%;padding:14px;background:#5e17eb;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer}}
-    .note{{font-size:13px;color:#aeaeb2;margin-top:16px;line-height:1.5}}
+    .card{{background:#fff;border-radius:20px;padding:36px 32px;max-width:420px;width:100%;box-shadow:0 4px 30px rgba(0,0,0,.08);text-align:center}}
+    .logo{{width:72px;height:72px;border-radius:16px;margin:0 auto 16px;display:block}}
+    h1{{font-size:22px;font-weight:700;color:#1d1d1f;margin-bottom:6px}}
+    .subtitle{{color:#6e6e73;font-size:14px;margin-bottom:24px}}
+    .chave-label{{font-size:12px;font-weight:600;color:#aeaeb2;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}}
+    .chave-row{{display:flex;align-items:center;gap:10px;margin-bottom:24px}}
+    .chave-box{{flex:1;background:#f5f5f7;border-radius:12px;padding:14px 16px;font-family:monospace;font-size:20px;font-weight:700;color:#5e17eb;letter-spacing:3px;word-break:break-all;text-align:center}}
+    .btn-copiar{{padding:14px 18px;background:#f5f5f7;color:#5e17eb;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .2s}}
+    .btn-copiar:hover{{background:#ede8fb}}
+    .steps{{text-align:left;margin-bottom:24px}}
+    .steps-title{{font-size:13px;font-weight:600;color:#aeaeb2;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;text-align:center}}
+    .step{{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}}
+    .step-num{{min-width:28px;height:28px;background:#5e17eb;color:#fff;border-radius:50%;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}}
+    .step-text{{font-size:14px;color:#3a3a3c;line-height:1.5;padding-top:4px}}
+    .step-text strong{{color:#1d1d1f}}
+    .btn-instalar{{display:block;width:100%;padding:15px;background:#5e17eb;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;text-decoration:none;margin-bottom:12px;transition:opacity .2s}}
+    .btn-instalar:hover{{opacity:.85}}
+    .note{{font-size:12px;color:#aeaeb2;line-height:1.5;margin-bottom:20px}}
+    .footer{{font-size:12px;color:#aeaeb2;border-top:1px solid #f0f0f0;padding-top:16px}}
+    .footer a{{color:#5e17eb;text-decoration:none}}
   </style>
 </head>
 <body>
 <div class="card">
-  <div class="icon">✅</div>
-  <h1>Atalho ativado!</h1>
-  <p>Este é seu código de ativação. Você precisará dele no próximo passo do tutorial.</p>
-  <div class="chave-box" id="chave">{chave}</div>
-  <button onclick="copiar()">Copiar código</button>
-  <p class="note">Guarde este código. Você só precisará digitá-lo <strong>uma vez</strong> no atalho.<br>Após isso, o atalho funciona automaticamente.</p>
+  <img class="logo" src="{APP_URL}/static/icone.png" alt="Baixar Agora">
+  <h1>Atalho ativado! ✅</h1>
+  <p class="subtitle">Siga os 3 passos abaixo para começar a usar</p>
+
+  <p class="chave-label">Seu código de ativação</p>
+  <div class="chave-row">
+    <div class="chave-box" id="chave">{chave}</div>
+    <button class="btn-copiar" onclick="copiar()">Copiar</button>
+  </div>
+
+  <div class="steps">
+    <p class="steps-title">Como ativar</p>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text"><strong>Copie o código</strong> acima clicando no botão "Copiar"</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text"><strong>Instale o atalho</strong> clicando no botão abaixo</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-text"><strong>Na primeira abertura</strong>, cole o código quando o atalho solicitar — nunca mais precisará digitar</div>
+    </div>
+  </div>
+
+  <a class="btn-instalar" href="https://www.icloud.com/shortcuts/5fc0b24b83de40d2bb41e4bfa4894020">Instalar Baixar Agora →</a>
+
+  <p class="note">Guarde este código em local seguro. Você só precisará digitá-lo <strong>uma vez</strong>.</p>
+
+  <p class="footer">Dúvidas? <a href="mailto:suporte@baixaragora.com.br">suporte@baixaragora.com.br</a></p>
 </div>
 <script>
 function copiar() {{
   navigator.clipboard.writeText('{chave}').then(() => {{
-    document.querySelector('button').textContent = '✅ Copiado!';
-    setTimeout(() => document.querySelector('button').textContent = 'Copiar código', 2000);
+    const btn = document.querySelector('.btn-copiar');
+    btn.textContent = '✅ Copiado!';
+    setTimeout(() => btn.textContent = 'Copiar', 2000);
   }});
 }}
 </script>
@@ -279,20 +326,26 @@ def build_erro_html(msg: str) -> str:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Erro</title>
+  <title>Baixar Agora — Erro</title>
+  <link rel="icon" type="image/png" href="{APP_URL}/static/icone.png">
+  <link rel="apple-touch-icon" href="{APP_URL}/static/icone.png">
   <style>
     body{{font-family:-apple-system,sans-serif;background:#f5f5f7;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}}
     .card{{background:#fff;border-radius:20px;padding:40px;max-width:420px;width:100%;text-align:center;box-shadow:0 4px 30px rgba(0,0,0,.08)}}
-    h1{{color:#ff3b30;margin-bottom:12px}}
+    .logo{{width:56px;height:56px;border-radius:12px;margin:0 auto 16px;display:block}}
+    h1{{color:#ff3b30;margin-bottom:12px;font-size:20px}}
     p{{color:#6e6e73;font-size:15px}}
     a{{color:#5e17eb;text-decoration:none;font-weight:600}}
+    .footer{{font-size:12px;color:#aeaeb2;margin-top:24px;border-top:1px solid #f0f0f0;padding-top:16px}}
   </style>
 </head>
 <body>
 <div class="card">
+  <img class="logo" src="{APP_URL}/static/icone.png" alt="Baixar Agora">
   <h1>⚠️ Erro</h1>
   <p>{msg}</p>
   <p style="margin-top:16px"><a href="/ativar">← Tentar novamente</a></p>
+  <p class="footer">Precisa de ajuda? <a href="mailto:suporte@baixaragora.com.br">suporte@baixaragora.com.br</a></p>
 </div>
 </body>
 </html>"""
@@ -553,6 +606,8 @@ CORTESIA_HTML = """<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Baixar Agora — Cortesia</title>
+  <link rel="icon" type="image/png" href="https://instagram-downloader-wgvm.onrender.com/static/icone.png">
+  <link rel="apple-touch-icon" href="https://instagram-downloader-wgvm.onrender.com/static/icone.png">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f7;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
