@@ -519,6 +519,34 @@ async def add_comprador(body: CompradorRequest, x_admin_key: str = Header(None))
            ON CONFLICT (email) DO UPDATE SET ativo = 1""",
         (email,),
     )
+
+    codigo = str(random.randint(100000, 999999))
+    expira_em = datetime.now(timezone.utc) + timedelta(minutes=30)
+    db_execute(
+        """INSERT INTO temp_codigos (email, codigo, expira_em)
+           VALUES (%s, %s, %s)
+           ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, expira_em = EXCLUDED.expira_em""",
+        (email, codigo, expira_em),
+    )
+
+    link = f"{APP_URL}/confirmar?email={email}&codigo={codigo}"
+    html_body = f"""
+    <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
+      <img src="{APP_URL}/static/icone.png" alt="Baixar Agora" width="80" height="80" style="border-radius:18px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto">
+      <h2 style="color:#1d1d1f;margin-bottom:8px">Seu código de ativação</h2>
+      <p style="color:#6e6e73;margin-bottom:24px">Você recebeu acesso ao atalho <strong>Baixar Agora</strong>. Use este código para ativar.</p>
+      <div style="background:#f5f5f7;border-radius:12px;padding:20px;font-size:40px;font-weight:700;color:#5e17eb;letter-spacing:10px">{codigo}</div>
+      <p style="margin:24px 0 8px;color:#6e6e73">Ou clique no botão abaixo para ativar diretamente:</p>
+      <a href="{link}" style="display:inline-block;padding:14px 28px;background:#5e17eb;color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px">Ativar meu atalho</a>
+      <p style="color:#aeaeb2;font-size:13px;margin-top:24px">Este código expira em 30 minutos.</p>
+      <p style="color:#aeaeb2;font-size:12px;margin-top:24px;border-top:1px solid #f0f0f0;padding-top:16px">Dúvidas? Fale com a gente: <a href="mailto:suporte@baixaragora.com.br" style="color:#5e17eb;text-decoration:none">suporte@baixaragora.com.br</a></p>
+    </div>
+    """
+    try:
+        send_email(email, f"Código de ativação Baixar Agora: {codigo}", html_body)
+    except Exception:
+        pass
+
     return {"ok": True, "email": email, "status": "ativo"}
 
 
@@ -653,13 +681,7 @@ document.getElementById('form').addEventListener('submit', async e => {
     const data = await res.json();
     if (res.ok) {
       msg.className = 'msg success';
-      msg.textContent = '✅ Acesso liberado! O e-mail de ativação foi enviado.';
-      // Disparar e-mail de ativação automaticamente
-      await fetch('/ativar', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({email: document.getElementById('email').value})
-      });
+      msg.textContent = '✅ Acesso liberado! O e-mail de ativação foi enviado automaticamente.';
       document.getElementById('form').style.display = 'none';
     } else {
       msg.className = 'msg error';
