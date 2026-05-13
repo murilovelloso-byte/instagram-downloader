@@ -1298,6 +1298,10 @@ function hideTip() {
 const saved = sessionStorage.getItem('admin_key');
 if (saved) { document.getElementById('loginKey').value = saved; entrar(); }
 </script>
+<footer style="margin-top:48px;padding:24px 0 32px;border-top:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:13px">
+  Baixar Agora &mdash; Painel Administrativo &nbsp;·&nbsp; <span id="footerAno"></span>
+  <script>document.getElementById('footerAno').textContent=new Date().getFullYear();</script>
+</footer>
 </body>
 </html>"""
 
