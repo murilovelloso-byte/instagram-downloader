@@ -955,9 +955,6 @@ tbody tr:hover td{background:#fafbff}
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Sair
       </button>
-      <div style="padding:10px 12px 4px;font-size:11px;color:rgba(255,255,255,.25);line-height:1.6">
-        Baixar Agora<br>Painel Administrativo
-      </div>
     </div>
   </aside>
 
@@ -1301,6 +1298,9 @@ function hideTip() {
 const saved = sessionStorage.getItem('admin_key');
 if (saved) { document.getElementById('loginKey').value = saved; entrar(); }
 </script>
+<footer style="margin-left:-240px;background:#0f172a;padding:18px 24px;text-align:center;color:rgba(255,255,255,.3);font-size:12px;border-top:1px solid rgba(255,255,255,.07)">
+  Baixar Agora &mdash; Painel Administrativo
+</footer>
 </body>
 </html>"""
 
