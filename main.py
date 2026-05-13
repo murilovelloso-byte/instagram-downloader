@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import random
 import secrets
+import uuid as uuid_lib
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse, unquote
 
@@ -126,6 +127,15 @@ def init_db():
             """)
             cur.execute("""
                 ALTER TABLE compradores ADD COLUMN IF NOT EXISTS fonte TEXT DEFAULT 'compra'
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS dispositivos (
+                    chave TEXT NOT NULL,
+                    device_id TEXT NOT NULL,
+                    primeiro_uso TIMESTAMPTZ DEFAULT NOW(),
+                    ultimo_uso TIMESTAMPTZ DEFAULT NOW(),
+                    PRIMARY KEY (chave, device_id)
+                )
             """)
         conn.commit()
     finally:
@@ -372,7 +382,7 @@ def build_confirmar_html(chave: str) -> str:
     </div>
   </div>
 
-  <a class="btn-instalar" href="https://www.icloud.com/shortcuts/5fc0b24b83de40d2bb41e4bfa4894020">Instalar Baixar Agora →</a>
+  <a class="btn-instalar" href="https://www.icloud.com/shortcuts/42e7cdf1c12b4ac7889e2dc0ceaa67a0">Instalar Baixar Agora →</a>
 
   <p class="note">Guarde este código em local seguro. Você só precisará digitá-lo <strong>uma vez</strong>.</p>
 
@@ -420,6 +430,21 @@ def build_erro_html(msg: str) -> str:
 </div>
 </body>
 </html>"""
+
+
+def build_alerta_html() -> str:
+    return f"""
+    <div style="font-family:-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:40px 20px;text-align:center">
+      <img src="{APP_URL}/static/icone.png" alt="Baixar Agora" width="80" height="80" style="border-radius:18px;margin-bottom:20px;display:block;margin-left:auto;margin-right:auto">
+      <h2 style="color:#1d1d1f;margin-bottom:8px">⚠️ Aviso importante</h2>
+      <p style="color:#6e6e73;margin-bottom:16px">Identificamos que sua chave de ativação do <strong>Baixar Agora</strong> está sendo utilizada em mais de um dispositivo.</p>
+      <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:12px;padding:16px;margin-bottom:20px;text-align:left">
+        <p style="color:#856404;font-size:14px;line-height:1.6;margin:0">⚠️ <strong>Isso viola os Termos de Uso do serviço.</strong> O acesso é estritamente pessoal e intransferível — o compartilhamento da sua chave não é permitido.</p>
+      </div>
+      <p style="color:#6e6e73;margin-bottom:24px">Caso o uso indevido continue, sua chave será <strong>revogada permanentemente</strong> sem direito a reembolso, conforme nossos termos de uso.</p>
+      <p style="color:#6e6e73;font-size:14px">Se acredita que houve um engano, entre em contato com nosso suporte.</p>
+      <p style="color:#aeaeb2;font-size:12px;margin-top:24px;border-top:1px solid #f0f0f0;padding-top:16px">Dúvidas? <a href="mailto:suporte@baixaragora.com.br" style="color:#5e17eb;text-decoration:none">suporte@baixaragora.com.br</a></p>
+    </div>"""
 
 
 # --- Activation endpoints ---
@@ -500,6 +525,7 @@ async def confirmar(token: str = Query(...)):
 async def download(
     url: str = Query(..., description="URL do vídeo (Instagram, YouTube ou TikTok)"),
     chave: str = Query(..., description="Chave de ativação"),
+    device_id: str = Query(None, description="ID único do dispositivo"),
 ):
     row = db_fetchone(
         """SELECT c.email FROM chaves c
@@ -510,6 +536,14 @@ async def download(
 
     if not row:
         raise HTTPException(status_code=401, detail="Chave inválida ou acesso revogado.")
+
+    if device_id:
+        db_execute(
+            """INSERT INTO dispositivos (chave, device_id)
+               VALUES (%s, %s)
+               ON CONFLICT (chave, device_id) DO UPDATE SET ultimo_uso = NOW()""",
+            (chave, device_id),
+        )
 
     if not is_valid_url(url):
         raise HTTPException(
@@ -548,6 +582,14 @@ async def download(
         if tmpdir:
             shutil.rmtree(tmpdir, ignore_errors=True)
         raise HTTPException(status_code=500, detail=f"Erro interno: {e}")
+
+
+# --- Device UUID ---
+
+
+@app.get("/gerar-uuid")
+async def gerar_device_id():
+    return {"uuid": str(uuid_lib.uuid4())}
 
 
 # --- Admin endpoints ---
@@ -597,7 +639,8 @@ async def list_compradores(x_admin_key: str = Header(None)):
     require_admin(x_admin_key)
     rows = db_fetchall(
         """SELECT c.email, c.ativo, c.fonte, c.criado_em,
-                  CASE WHEN k.chave IS NOT NULL THEN true ELSE false END as ativado
+                  CASE WHEN k.chave IS NOT NULL THEN true ELSE false END as ativado,
+                  COALESCE((SELECT COUNT(DISTINCT d.device_id)::int FROM dispositivos d WHERE d.chave = k.chave), 0) as num_dispositivos
            FROM compradores c
            LEFT JOIN chaves k ON c.email = k.email
            ORDER BY c.criado_em DESC"""
@@ -649,6 +692,33 @@ async def reenviar_ativacao(email: str, background_tasks: BackgroundTasks, x_adm
         raise HTTPException(status_code=404, detail="Comprador não encontrado.")
     subject, html_body, text_body = gerar_ativacao(email, "Aqui está seu novo código de ativação do atalho <strong>Baixar Agora</strong>")
     background_tasks.add_task(send_email, email, subject, html_body, text_body)
+    return {"ok": True, "email": email}
+
+
+@app.post("/admin/alerta/{email}")
+async def enviar_alerta(email: str, x_admin_key: str = Header(None)):
+    require_admin(x_admin_key)
+    email = email.lower().strip()
+    comprador = db_fetchone("SELECT ativo FROM compradores WHERE email = %s", (email,))
+    if not comprador:
+        raise HTTPException(status_code=404, detail="Comprador não encontrado.")
+    html_body = build_alerta_html()
+    text_body = (
+        "Baixar Agora — Aviso de Violação\n\n"
+        "Identificamos que sua chave de ativação está sendo utilizada em mais de um dispositivo.\n\n"
+        "Isso viola os Termos de Uso do serviço. O acesso é pessoal e intransferível.\n\n"
+        "Caso o uso indevido continue, sua chave será revogada permanentemente sem direito a reembolso.\n\n"
+        "Se acredita que houve um engano, entre em contato: suporte@baixaragora.com.br"
+    )
+    try:
+        send_email(
+            email,
+            "⚠️ Aviso: uso em múltiplos dispositivos detectado — Baixar Agora",
+            html_body,
+            text_body,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao enviar e-mail: {e}")
     return {"ok": True, "email": email}
 
 
@@ -736,7 +806,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 /* ── CONTENT ── */
 .content{padding:24px 28px;flex:1}
 /* ── STAT CARDS ── */
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:24px}
 .stat-card{background:#fff;border-radius:14px;padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 2px 10px rgba(0,0,0,.04);display:flex;align-items:center;gap:16px;transition:box-shadow .2s}
 .stat-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.1)}
 .stat-card.featured{background:linear-gradient(135deg,#5e17eb 0%,#7c3aed 100%);box-shadow:0 4px 20px rgba(94,23,235,.35)}
@@ -746,6 +816,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .si-purple{background:rgba(94,23,235,.1)}
 .si-orange{background:rgba(245,158,11,.1)}
 .si-amber{background:rgba(180,83,9,.1)}
+.si-red{background:rgba(220,38,38,.1)}
 .stat-label{font-size:12px;font-weight:600;color:#64748b;margin-bottom:5px}
 .stat-value{font-size:28px;font-weight:700;color:#1e293b;line-height:1}
 .featured .stat-label{color:rgba(255,255,255,.7)}
@@ -800,6 +871,7 @@ tbody tr:hover td{background:#fafbff}
 .ra-ati{background:#ecfdf5;color:#059669}
 .ra-env{background:#f3f0ff;color:#5e17eb}
 .ra-del{background:#fff1f2;color:#9f1239;border:1px solid #fecdd3}
+.ra-alerta{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
 .tbl-empty{text-align:center;padding:48px;color:#94a3b8;font-size:14px}
 .tbl-load{text-align:center;padding:48px;color:#94a3b8}
 /* ── MODAL ── */
@@ -930,6 +1002,12 @@ tbody tr:hover td{background:#fafbff}
           </div>
           <div><div class="stat-label">Aguardando</div><div class="stat-value" id="sAguardando" style="color:#b45309">—</div></div>
         </div>
+        <div class="stat-card">
+          <div class="stat-icon si-red">
+            <svg width="20" height="20" fill="none" stroke="#dc2626" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div><div class="stat-label">Multi-device</div><div class="stat-value" id="sMultiDevice" style="color:#dc2626">—</div></div>
+        </div>
       </div>
 
       <!-- CHART -->
@@ -967,6 +1045,7 @@ tbody tr:hover td{background:#fafbff}
           <span class="pill" data-filtro="cortesia" onclick="setFiltro(this)">Cortesia</span>
           <span class="pill" data-filtro="aguardando" onclick="setFiltro(this)">Aguardando</span>
           <span class="pill" data-filtro="revogado" onclick="setFiltro(this)">Revogado</span>
+          <span class="pill" data-filtro="multidevice" onclick="setFiltro(this)">🔴 Multi-device</span>
         </div>
         <div id="tableWrap"><div class="tbl-load">Carregando...</div></div>
       </div>
@@ -1018,6 +1097,7 @@ function processar(data) {
   document.getElementById('sCompras').textContent = data.filter(d => d.fonte==='compra' && d.ativo).length;
   document.getElementById('sCortesias').textContent = data.filter(d => d.fonte==='cortesia' && d.ativo).length;
   document.getElementById('sAguardando').textContent = data.filter(d => d.ativo && !d.ativado).length;
+  document.getElementById('sMultiDevice').textContent = data.filter(d => (d.num_dispositivos||0) > 1).length;
   document.getElementById('lastUpdate').textContent = 'Atualizado ' + new Date().toLocaleTimeString('pt-BR');
   renderTabela(getFiltrado());
 }
@@ -1030,6 +1110,7 @@ function getFiltrado() {
     if (filtroAtivo === 'cortesia') return d.fonte === 'cortesia';
     if (filtroAtivo === 'aguardando') return d.ativo && !d.ativado;
     if (filtroAtivo === 'revogado') return !d.ativo;
+    if (filtroAtivo === 'multidevice') return (d.num_dispositivos||0) > 1;
     return true;
   });
 }
@@ -1058,7 +1139,10 @@ function renderTabela(lista) {
     const delBtn = !d.ativo
       ? `<button class="ra ra-del" onclick="excluir('${d.email}')">🗑 Excluir</button>`
       : '';
-    return `<tr><td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.email}</td><td>${fb}</td><td>${ab}</td><td>${sb}</td><td style="color:#94a3b8;font-size:13px">${dt}</td><td><div class="row-acts">${bt}<button class="ra ra-env" onclick="reenviar(event,'${d.email}')">Reenviar</button>${delBtn}</div></td></tr>`;
+    const multiDev = (d.num_dispositivos||0) > 1;
+    const alertaBtn = multiDev ? `<button class="ra ra-alerta" onclick="enviarAlerta(event,'${d.email}')">⚠️ Alertar</button>` : '';
+    const emailCell = `<div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.email}</div>${multiDev?'<div style="font-size:11px;color:#dc2626;font-weight:600;margin-top:3px">⚠️ '+d.num_dispositivos+' dispositivos</div>':''}`;
+    return `<tr><td style="max-width:220px">${emailCell}</td><td>${fb}</td><td>${ab}</td><td>${sb}</td><td style="color:#94a3b8;font-size:13px">${dt}</td><td><div class="row-acts">${bt}<button class="ra ra-env" onclick="reenviar(event,'${d.email}')">Reenviar</button>${alertaBtn}${delBtn}</div></td></tr>`;
   }).join('');
   wrap.innerHTML = `<table><thead><tr><th>E-mail</th><th>Tipo</th><th>Ativação</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -1085,6 +1169,14 @@ async function reenviar(e,email) {
   await fetch('/admin/reenviar/'+encodeURIComponent(email),{method:'POST',headers:{'X-Admin-Key':adminKey}});
   btn.textContent='✅ Enviado';
   setTimeout(()=>{btn.textContent='Reenviar';btn.disabled=false;},3000);
+}
+async function enviarAlerta(e, email) {
+  const btn = e.target;
+  if (!confirm('Enviar aviso de violação para ' + email + '?')) return;
+  btn.textContent = '...'; btn.disabled = true;
+  await fetch('/admin/alerta/' + encodeURIComponent(email), {method:'POST', headers:{'X-Admin-Key':adminKey}});
+  btn.textContent = '✅ Enviado';
+  setTimeout(() => {btn.textContent = '⚠️ Alertar'; btn.disabled = false;}, 3000);
 }
 function abrirModal() {
   document.getElementById('modalEmail').value='';
