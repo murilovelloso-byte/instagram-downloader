@@ -1298,7 +1298,7 @@ function hideTip() {
 const saved = sessionStorage.getItem('admin_key');
 if (saved) { document.getElementById('loginKey').value = saved; entrar(); }
 </script>
-<footer style="margin-left:-240px;width:100vw;background:#0f172a;margin-top:48px;padding:22px 0 26px;text-align:center;color:rgba(255,255,255,.35);font-size:12px;border-top:1px solid rgba(255,255,255,.07)">
+<footer style="background:#0f172a;padding:22px 0 26px;text-align:center;color:rgba(255,255,255,.45);font-size:12px;border-top:1px solid rgba(255,255,255,.07);margin:0">
   Baixar Agora &mdash; Painel Administrativo
 </footer>
 </body>
