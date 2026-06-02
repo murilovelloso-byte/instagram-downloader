@@ -193,6 +193,8 @@ def gerar_ativacao(email: str, texto_intro: str) -> tuple:
       <div style="background:#f5f5f7;border-radius:12px;padding:20px;font-size:40px;font-weight:700;color:#5e17eb;letter-spacing:10px">{codigo}</div>
       <p style="margin:24px 0 8px;color:#6e6e73">Prefere ativar sem digitar o código? Clique no botão abaixo e a ativação acontece automaticamente:</p>
       <a href="{link}" style="display:inline-block;padding:14px 28px;background:#5e17eb;color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px">Ativar meu atalho</a>
+      <p style="margin:20px 0 8px;color:#6e6e73;font-size:14px">Quer ver como funciona antes de instalar?</p>
+      <a href="https://player.mediadelivery.net/play/674361/e082ba88-e112-42d5-bf08-9cef4e342417" style="display:inline-block;padding:11px 24px;background:#f5f5f7;color:#5e17eb;border-radius:12px;text-decoration:none;font-weight:600;font-size:14px">▶ Assistir tutorial</a>
       <p style="color:#aeaeb2;font-size:13px;margin-top:24px">Este código expira em 30 minutos a partir do recebimento deste e-mail. Após expirar, acesse o site novamente para solicitar um novo código.</p>
       <p style="color:#ff3b30;font-size:13px;margin-top:16px;line-height:1.5;border:1px solid #ff3b30;border-radius:10px;padding:12px;">⚠️ <strong>Atenção:</strong> Caso o código de ativação seja usado em mais de um aparelho, o seu acesso será revogado e o valor pago não será devolvido.</p>
       <p style="color:#aeaeb2;font-size:12px;margin-top:24px;border-top:1px solid #f0f0f0;padding-top:16px">Dúvidas? <a href="mailto:suporte@baixaragora.com.br" style="color:#5e17eb;text-decoration:none">suporte@baixaragora.com.br</a></p>
@@ -208,6 +210,9 @@ Seu código: {codigo}
 
 Prefere ativar sem digitar? Acesse o link abaixo:
 {link}
+
+Quer ver como funciona? Assista ao tutorial:
+https://player.mediadelivery.net/play/674361/e082ba88-e112-42d5-bf08-9cef4e342417
 
 ATENÇÃO: Caso o código seja usado em mais de um aparelho, o acesso será revogado sem direito a reembolso.
 
@@ -383,6 +388,8 @@ def build_confirmar_html(chave: str) -> str:
   </div>
 
   <a class="btn-instalar" href="https://www.icloud.com/shortcuts/42e7cdf1c12b4ac7889e2dc0ceaa67a0">Instalar Baixar Agora →</a>
+
+  <a href="https://player.mediadelivery.net/play/674361/e082ba88-e112-42d5-bf08-9cef4e342417" style="display:block;width:100%;padding:13px;background:#f5f5f7;color:#5e17eb;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;margin-bottom:12px;text-align:center;box-sizing:border-box">▶ Assistir tutorial</a>
 
   <p class="note">Guarde este código em local seguro. Você só precisará digitá-lo <strong>uma vez</strong>.</p>
 
