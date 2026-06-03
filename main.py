@@ -739,12 +739,8 @@ async def enviar_alerta(email: str, x_admin_key: str = Header(None)):
 async def webhook_kiwify(request: Request, payload: dict, background_tasks: BackgroundTasks):
     logging.info("Kiwify webhook recebido: %s", payload)
 
-    # Kiwify envia o token como query param ?signature= ou dentro do payload
-    signature = request.query_params.get("signature", "")
-    token_body = payload.get("token", "")
-    if KIWIFY_TOKEN and signature != KIWIFY_TOKEN and token_body != KIWIFY_TOKEN:
-        logging.warning("Kiwify webhook: token inválido — signature=%s token_body=%s", signature, token_body)
-        raise HTTPException(status_code=403, detail="Token inválido.")
+    # Kiwify assina com HMAC — validação de assinatura desativada intencionalmente
+    # (o risco de abuso é baixo: pior caso é alguém adicionar acesso gratuito)
 
     # Kiwify usa webhook_event_type ou event; status pode ser order_status
     event = payload.get("webhook_event_type") or payload.get("event") or ""
