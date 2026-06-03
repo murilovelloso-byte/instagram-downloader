@@ -16,7 +16,7 @@ import psycopg2
 import psycopg2.extras
 import psycopg2.pool
 import yt_dlp
-from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -736,15 +736,18 @@ async def enviar_alerta(email: str, x_admin_key: str = Header(None)):
 
 
 @app.post("/webhook/kiwify")
-async def webhook_kiwify(payload: dict, background_tasks: BackgroundTasks):
+async def webhook_kiwify(request: Request, payload: dict, background_tasks: BackgroundTasks):
     logging.info("Kiwify webhook recebido: %s", payload)
 
-    token = payload.get("token", "")
-    if KIWIFY_TOKEN and token != KIWIFY_TOKEN:
-        logging.warning("Kiwify webhook: token inválido recebido")
+    # Kiwify envia o token como query param ?signature= ou dentro do payload
+    signature = request.query_params.get("signature", "")
+    token_body = payload.get("token", "")
+    if KIWIFY_TOKEN and signature != KIWIFY_TOKEN and token_body != KIWIFY_TOKEN:
+        logging.warning("Kiwify webhook: token inválido — signature=%s token_body=%s", signature, token_body)
         raise HTTPException(status_code=403, detail="Token inválido.")
 
-    event = payload.get("event", "") or payload.get("order_status", "")
+    # Kiwify usa webhook_event_type ou event; status pode ser order_status
+    event = payload.get("webhook_event_type") or payload.get("event") or ""
     status = payload.get("order_status", "")
 
     if event not in ("order_approved",) and status != "paid":
