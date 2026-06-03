@@ -5,8 +5,11 @@ import tempfile
 import random
 import secrets
 import uuid as uuid_lib
+import logging
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse, unquote
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 import httpx
 import psycopg2
@@ -734,29 +737,45 @@ async def enviar_alerta(email: str, x_admin_key: str = Header(None)):
 
 @app.post("/webhook/kiwify")
 async def webhook_kiwify(payload: dict, background_tasks: BackgroundTasks):
+    logging.info("Kiwify webhook recebido: %s", payload)
+
     token = payload.get("token", "")
     if KIWIFY_TOKEN and token != KIWIFY_TOKEN:
+        logging.warning("Kiwify webhook: token inválido recebido")
         raise HTTPException(status_code=403, detail="Token inválido.")
 
     event = payload.get("event", "") or payload.get("order_status", "")
     status = payload.get("order_status", "")
 
     if event not in ("order_approved",) and status != "paid":
+        logging.info("Kiwify webhook ignorado: event=%s status=%s", event, status)
         return {"ok": True, "ignored": True}
 
     customer = payload.get("Customer") or payload.get("customer") or {}
     email = (customer.get("email") or "").lower().strip()
 
     if not email:
+        logging.error("Kiwify webhook: e-mail não encontrado no payload. customer=%s", customer)
         raise HTTPException(status_code=400, detail="E-mail do comprador não encontrado.")
+
+    logging.info("Kiwify webhook: processando compra para %s", email)
 
     db_execute(
         """INSERT INTO compradores (email, ativo, fonte) VALUES (%s, 1, 'compra')
            ON CONFLICT (email) DO UPDATE SET ativo = 1""",
         (email,),
     )
+
     subject, html_body, text_body = gerar_ativacao(email, "Obrigado pela compra! Use este código para ativar o atalho <strong>Baixar Agora</strong>")
-    background_tasks.add_task(send_email, email, subject, html_body, text_body)
+
+    def send_with_log():
+        try:
+            send_email(email, subject, html_body, text_body)
+            logging.info("Kiwify webhook: e-mail enviado com sucesso para %s", email)
+        except Exception as exc:
+            logging.error("Kiwify webhook: FALHA ao enviar e-mail para %s — %s", email, exc)
+
+    background_tasks.add_task(send_with_log)
     return {"ok": True, "email": email}
 
 
