@@ -37,6 +37,7 @@ INSTAGRAM_COOKIES = os.getenv("INSTAGRAM_COOKIES", "")
 INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME", "")
 INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD", "")
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "")
+RAPIDAPI_YOUTUBE_HOST = os.getenv("RAPIDAPI_YOUTUBE_HOST", "")
 YOUTUBE_COOKIES = os.getenv("YOUTUBE_COOKIES", "")
 YOUTUBE_COOKIES_B64 = os.getenv("YOUTUBE_COOKIES_B64", "")
 
@@ -374,6 +375,88 @@ def is_valid_url(url: str) -> bool:
     return bool(SUPPORTED_URL_PATTERN.search(url))
 
 
+def _extract_url_from_rapidapi_yt_response(data) -> str | None:
+    """Try to extract a video URL from various RapidAPI YouTube response formats."""
+    if isinstance(data, str) and data.startswith("http"):
+        return data
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                u = item.get("url") or item.get("link") or item.get("src") or item.get("download_url")
+                ext = (item.get("ext") or item.get("format") or item.get("type") or "")
+                if u and ("mp4" in ext.lower() or "video" in ext.lower()):
+                    return u
+        for item in data:
+            if isinstance(item, dict):
+                u = item.get("url") or item.get("link") or item.get("src") or item.get("download_url")
+                if u and isinstance(u, str) and u.startswith("http"):
+                    return u
+    if isinstance(data, dict):
+        for key in ("url", "link", "download", "download_url", "src"):
+            v = data.get(key)
+            if isinstance(v, str) and v.startswith("http"):
+                return v
+            if isinstance(v, list):
+                found = _extract_url_from_rapidapi_yt_response(v)
+                if found:
+                    return found
+        for key in ("formats", "streams", "sources", "videos", "links", "data", "results"):
+            v = data.get(key)
+            if isinstance(v, list):
+                found = _extract_url_from_rapidapi_yt_response(v)
+                if found:
+                    return found
+    return None
+
+
+def download_youtube_rapidapi(url: str, tmpdir: str) -> tuple[str, str, str]:
+    if not RAPIDAPI_KEY or not RAPIDAPI_YOUTUBE_HOST:
+        raise ValueError("RAPIDAPI_YOUTUBE_HOST não configurada")
+    host = RAPIDAPI_YOUTUBE_HOST
+    import re as _re
+    vid_match = _re.search(r"(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})", url)
+    video_id = vid_match.group(1) if vid_match else None
+    candidates = [
+        ("/get", {"url": url}),
+        ("/dl", {"url": url}),
+        ("/download", {"url": url}),
+        ("/video", {"url": url}),
+    ]
+    if video_id:
+        candidates += [
+            ("/dl", {"id": video_id}),
+            ("/get", {"id": video_id}),
+        ]
+    last_err = None
+    for path, params in candidates:
+        try:
+            r = httpx.get(
+                f"https://{host}{path}",
+                params=params,
+                headers={"x-rapidapi-key": RAPIDAPI_KEY, "x-rapidapi-host": host},
+                timeout=30,
+            )
+            if r.status_code == 404:
+                continue
+            r.raise_for_status()
+            data = r.json()
+            video_url = _extract_url_from_rapidapi_yt_response(data)
+            if not video_url:
+                last_err = ValueError(f"RapidAPI YT sem URL de vídeo: {str(data)[:200]}")
+                continue
+            filepath = os.path.join(tmpdir, "video.mp4")
+            with httpx.stream("GET", video_url, timeout=120, follow_redirects=True) as resp:
+                resp.raise_for_status()
+                with open(filepath, "wb") as f:
+                    for chunk in resp.iter_bytes(65536):
+                        f.write(chunk)
+            return tmpdir, filepath, "mp4"
+        except Exception as e:
+            last_err = e
+            continue
+    raise ValueError(f"RapidAPI YouTube falhou em todos os endpoints: {last_err}")
+
+
 def download_video(url: str) -> tuple[str, str, str]:
     """Download video to temp dir. Returns (tmpdir, filepath, ext)."""
     # Instagram: tenta RapidAPI → instaloader → yt-dlp
@@ -407,9 +490,18 @@ def download_video(url: str) -> tuple[str, str, str]:
             logging.warning("tikwm falhou (%s) — tentando yt-dlp", e)
             shutil.rmtree(tmpdir, ignore_errors=True)
 
-    # YouTube e fallback via yt-dlp
-    tmpdir = tempfile.mkdtemp()
+    # YouTube: RapidAPI → yt-dlp
     is_youtube = "youtube.com" in url or "youtu.be" in url
+    if is_youtube and RAPIDAPI_KEY and RAPIDAPI_YOUTUBE_HOST:
+        tmpdir = tempfile.mkdtemp()
+        try:
+            return download_youtube_rapidapi(url, tmpdir)
+        except Exception as e:
+            logging.warning("RapidAPI YouTube falhou (%s) — tentando yt-dlp", e)
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    # yt-dlp fallback
+    tmpdir = tempfile.mkdtemp()
     yt_cookies = get_youtube_cookies_file()
     ig_cookies = get_cookies_file()
 
