@@ -37,8 +37,10 @@ INSTAGRAM_COOKIES = os.getenv("INSTAGRAM_COOKIES", "")
 INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME", "")
 INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD", "")
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "")
+YOUTUBE_COOKIES = os.getenv("YOUTUBE_COOKIES", "")
 
 _cookies_file: str | None = None
+_yt_cookies_file: str | None = None
 _instaloader = None
 
 
@@ -53,6 +55,20 @@ def get_cookies_file() -> str | None:
         f.write(INSTAGRAM_COOKIES)
     _cookies_file = path
     logging.info("Cookies do Instagram gravados em %s", path)
+    return path
+
+
+def get_youtube_cookies_file() -> str | None:
+    global _yt_cookies_file
+    if not YOUTUBE_COOKIES:
+        return None
+    if _yt_cookies_file and os.path.exists(_yt_cookies_file):
+        return _yt_cookies_file
+    fd, path = tempfile.mkstemp(suffix=".txt", prefix="yt_cookies_")
+    with os.fdopen(fd, "w") as f:
+        f.write(YOUTUBE_COOKIES)
+    _yt_cookies_file = path
+    logging.info("Cookies do YouTube gravados em %s", path)
     return path
 
 
@@ -392,9 +408,13 @@ def download_video(url: str) -> tuple[str, str, str]:
         "no_warnings": True,
         "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
     }
-    cookies_file = get_cookies_file()
-    if cookies_file:
-        ydl_opts["cookiefile"] = cookies_file
+    yt_cookies = get_youtube_cookies_file()
+    ig_cookies = get_cookies_file()
+    is_youtube = "youtube.com" in url or "youtu.be" in url
+    if yt_cookies and is_youtube:
+        ydl_opts["cookiefile"] = yt_cookies
+    elif ig_cookies and not is_youtube:
+        ydl_opts["cookiefile"] = ig_cookies
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         ext = info.get("ext", "mp4")
