@@ -375,86 +375,41 @@ def is_valid_url(url: str) -> bool:
     return bool(SUPPORTED_URL_PATTERN.search(url))
 
 
-def _extract_url_from_rapidapi_yt_response(data) -> str | None:
-    """Try to extract a video URL from various RapidAPI YouTube response formats."""
-    if isinstance(data, str) and data.startswith("http"):
-        return data
-    if isinstance(data, list):
-        for item in data:
-            if isinstance(item, dict):
-                u = item.get("url") or item.get("link") or item.get("src") or item.get("download_url")
-                ext = (item.get("ext") or item.get("format") or item.get("type") or "")
-                if u and ("mp4" in ext.lower() or "video" in ext.lower()):
-                    return u
-        for item in data:
-            if isinstance(item, dict):
-                u = item.get("url") or item.get("link") or item.get("src") or item.get("download_url")
-                if u and isinstance(u, str) and u.startswith("http"):
-                    return u
-    if isinstance(data, dict):
-        for key in ("url", "link", "download", "download_url", "src"):
-            v = data.get(key)
-            if isinstance(v, str) and v.startswith("http"):
-                return v
-            if isinstance(v, list):
-                found = _extract_url_from_rapidapi_yt_response(v)
-                if found:
-                    return found
-        for key in ("formats", "streams", "sources", "videos", "links", "data", "results"):
-            v = data.get(key)
-            if isinstance(v, list):
-                found = _extract_url_from_rapidapi_yt_response(v)
-                if found:
-                    return found
-    return None
-
-
 def download_youtube_rapidapi(url: str, tmpdir: str) -> tuple[str, str, str]:
-    if not RAPIDAPI_KEY or not RAPIDAPI_YOUTUBE_HOST:
-        raise ValueError("RAPIDAPI_YOUTUBE_HOST não configurada")
-    host = RAPIDAPI_YOUTUBE_HOST
+    if not RAPIDAPI_KEY:
+        raise ValueError("RAPIDAPI_KEY não configurada")
+    host = RAPIDAPI_YOUTUBE_HOST or "youtube-media-downloader.p.rapidapi.com"
     import re as _re
     vid_match = _re.search(r"(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})", url)
-    video_id = vid_match.group(1) if vid_match else None
-    candidates = [
-        ("/get", {"url": url}),
-        ("/dl", {"url": url}),
-        ("/download", {"url": url}),
-        ("/video", {"url": url}),
-    ]
-    if video_id:
-        candidates += [
-            ("/dl", {"id": video_id}),
-            ("/get", {"id": video_id}),
-        ]
-    last_err = None
-    for path, params in candidates:
-        try:
-            r = httpx.get(
-                f"https://{host}{path}",
-                params=params,
-                headers={"x-rapidapi-key": RAPIDAPI_KEY, "x-rapidapi-host": host},
-                timeout=30,
-            )
-            if r.status_code == 404:
-                continue
-            r.raise_for_status()
-            data = r.json()
-            video_url = _extract_url_from_rapidapi_yt_response(data)
-            if not video_url:
-                last_err = ValueError(f"RapidAPI YT sem URL de vídeo: {str(data)[:200]}")
-                continue
-            filepath = os.path.join(tmpdir, "video.mp4")
-            with httpx.stream("GET", video_url, timeout=120, follow_redirects=True) as resp:
-                resp.raise_for_status()
-                with open(filepath, "wb") as f:
-                    for chunk in resp.iter_bytes(65536):
-                        f.write(chunk)
-            return tmpdir, filepath, "mp4"
-        except Exception as e:
-            last_err = e
-            continue
-    raise ValueError(f"RapidAPI YouTube falhou em todos os endpoints: {last_err}")
+    if not vid_match:
+        raise ValueError("ID do vídeo do YouTube não encontrado na URL")
+    video_id = vid_match.group(1)
+    r = httpx.get(
+        f"https://{host}/v2/video/details",
+        params={"videoId": video_id},
+        headers={"x-rapidapi-key": RAPIDAPI_KEY, "x-rapidapi-host": host},
+        timeout=30,
+    )
+    r.raise_for_status()
+    data = r.json()
+    if data.get("errorId") != "Success":
+        raise ValueError(f"YouTube Media Downloader: {data.get('errorId')}")
+    videos = data.get("videos", {}).get("items", [])
+    if not videos:
+        raise ValueError("Nenhum stream de vídeo disponível")
+    # Preferir pré-combinado (vídeo+áudio), senão pega o de maior qualidade
+    video_item = next((v for v in videos if v.get("hasAudio")), videos[0])
+    video_url = video_item.get("url")
+    if not video_url:
+        raise ValueError("URL do vídeo não encontrada na resposta da API")
+    logging.info("YouTube RapidAPI: %s quality=%s hasAudio=%s", video_id, video_item.get("quality"), video_item.get("hasAudio"))
+    filepath = os.path.join(tmpdir, "video.mp4")
+    with httpx.stream("GET", video_url, timeout=120, follow_redirects=True) as resp:
+        resp.raise_for_status()
+        with open(filepath, "wb") as f:
+            for chunk in resp.iter_bytes(65536):
+                f.write(chunk)
+    return tmpdir, filepath, "mp4"
 
 
 def download_video(url: str) -> tuple[str, str, str]:
@@ -492,7 +447,7 @@ def download_video(url: str) -> tuple[str, str, str]:
 
     # YouTube: RapidAPI → yt-dlp
     is_youtube = "youtube.com" in url or "youtu.be" in url
-    if is_youtube and RAPIDAPI_KEY and RAPIDAPI_YOUTUBE_HOST:
+    if is_youtube and RAPIDAPI_KEY:
         tmpdir = tempfile.mkdtemp()
         try:
             return download_youtube_rapidapi(url, tmpdir)
