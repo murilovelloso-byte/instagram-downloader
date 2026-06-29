@@ -36,6 +36,7 @@ KIWIFY_TOKEN = os.getenv("KIWIFY_TOKEN", "")
 INSTAGRAM_COOKIES = os.getenv("INSTAGRAM_COOKIES", "")
 INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME", "")
 INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD", "")
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "")
 
 _cookies_file: str | None = None
 _instaloader = None
@@ -103,6 +104,33 @@ def download_instagram_instaloader(url: str, tmpdir: str) -> tuple[str, str, str
         r.raise_for_status()
         with open(filepath, "wb") as f:
             for chunk in r.iter_bytes(65536):
+                f.write(chunk)
+    return tmpdir, filepath, "mp4"
+
+
+def download_instagram_rapidapi(url: str, tmpdir: str) -> tuple[str, str, str]:
+    if not RAPIDAPI_KEY:
+        raise ValueError("RAPIDAPI_KEY não configurada")
+    api_url = "https://instagram-downloader-download-instagram-videos-stories.p.rapidapi.com/index"
+    r = httpx.get(
+        api_url,
+        params={"url": url},
+        headers={
+            "X-RapidAPI-Key": RAPIDAPI_KEY,
+            "X-RapidAPI-Host": "instagram-downloader-download-instagram-videos-stories.p.rapidapi.com",
+        },
+        timeout=30,
+    )
+    r.raise_for_status()
+    data = r.json()
+    video_url = data.get("media") or data.get("url") or data.get("video_url")
+    if not video_url:
+        raise ValueError(f"RapidAPI não retornou URL de vídeo: {data}")
+    filepath = os.path.join(tmpdir, "video.mp4")
+    with httpx.stream("GET", video_url, timeout=60, follow_redirects=True) as resp:
+        resp.raise_for_status()
+        with open(filepath, "wb") as f:
+            for chunk in resp.iter_bytes(65536):
                 f.write(chunk)
     return tmpdir, filepath, "mp4"
 
@@ -303,9 +331,19 @@ def is_valid_url(url: str) -> bool:
 
 def download_video(url: str) -> tuple[str, str, str]:
     """Download video to temp dir. Returns (tmpdir, filepath, ext)."""
-    # Instagram: tenta instaloader primeiro (usa conta bot se configurada)
+    # Instagram: tenta RapidAPI → instaloader → yt-dlp
     if "instagram.com" in url and _extract_ig_shortcode(url):
         tmpdir = tempfile.mkdtemp()
+        if RAPIDAPI_KEY:
+            try:
+                return download_instagram_rapidapi(url, tmpdir)
+            except HTTPException:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+                raise
+            except Exception as e:
+                logging.warning("RapidAPI falhou (%s) — tentando instaloader", e)
+                shutil.rmtree(tmpdir, ignore_errors=True)
+                tmpdir = tempfile.mkdtemp()
         try:
             return download_instagram_instaloader(url, tmpdir)
         except HTTPException:
