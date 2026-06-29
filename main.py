@@ -161,7 +161,7 @@ SUPPORTED_URL_PATTERN = re.compile(
     r"https?://("
     r"(www\.)?instagram\.com/(p|reel|tv|stories)/[\w\-]+/?"
     r"|"
-    r"(www\.)?(youtube\.com/(watch|shorts)|youtu\.be)/[\w\-\?=&]+"
+    r"(www\.)?(youtube\.com/(watch|shorts)|youtu\.be)[/\?][\w\-\?=&/]+"
     r"|"
     r"[\w\-\.]*tiktok\.com/[\w\-\?=&@/\.\%]+"
     r")",
