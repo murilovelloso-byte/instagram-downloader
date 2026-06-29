@@ -831,53 +831,6 @@ async def download(
         raise HTTPException(status_code=500, detail=f"Erro interno: {e}")
 
 
-@app.get("/debug/yt-test")
-async def debug_yt_test():
-    import traceback
-    result = {}
-    try:
-        host = RAPIDAPI_YOUTUBE_HOST or "youtube-media-downloader.p.rapidapi.com"
-        result["rapidapi_key_set"] = bool(RAPIDAPI_KEY)
-        result["host"] = host
-        r = httpx.get(
-            f"https://{host}/v2/video/details",
-            params={"videoId": "dQw4w9WgXcQ"},
-            headers={"x-rapidapi-key": RAPIDAPI_KEY, "x-rapidapi-host": host},
-            timeout=20,
-        )
-        result["api_status"] = r.status_code
-        data = r.json()
-        result["error_id"] = data.get("errorId")
-        videos = data.get("videos", {}).get("items", [])
-        result["video_count"] = len(videos)
-        if videos:
-            video_item = next((v for v in videos if v.get("hasAudio")), videos[0])
-            result["selected_quality"] = video_item.get("quality")
-            result["has_audio"] = video_item.get("hasAudio")
-            video_url = video_item.get("url", "")
-            result["cdn_domain"] = video_url.split("/")[2] if video_url else None
-            head_resp = httpx.head(video_url, timeout=10, follow_redirects=True)
-            result["cdn_head_status"] = head_resp.status_code
-            # Testar download completo
-            try:
-                import time
-                t0 = time.time()
-                total = 0
-                with httpx.stream("GET", video_url, timeout=60, follow_redirects=True) as s:
-                    result["cdn_get_status"] = s.status_code
-                    s.raise_for_status()
-                    for c in s.iter_bytes(65536):
-                        total += len(c)
-                result["cdn_bytes_total"] = total
-                result["cdn_duration_s"] = round(time.time() - t0, 1)
-            except Exception as e2:
-                result["cdn_get_error"] = str(e2)
-    except Exception as e:
-        result["error"] = str(e)
-        result["traceback"] = traceback.format_exc()
-    return result
-
-
 # --- Device UUID ---
 
 
