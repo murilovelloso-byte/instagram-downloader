@@ -111,21 +111,20 @@ def download_instagram_instaloader(url: str, tmpdir: str) -> tuple[str, str, str
 def download_instagram_rapidapi(url: str, tmpdir: str) -> tuple[str, str, str]:
     if not RAPIDAPI_KEY:
         raise ValueError("RAPIDAPI_KEY não configurada")
-    api_url = "https://instagram-downloader-download-instagram-videos-stories.p.rapidapi.com/index"
+    host = "instagram-downloader-download-instagram-stories-videos4.p.rapidapi.com"
     r = httpx.get(
-        api_url,
+        f"https://{host}/convert",
         params={"url": url},
-        headers={
-            "X-RapidAPI-Key": RAPIDAPI_KEY,
-            "X-RapidAPI-Host": "instagram-downloader-download-instagram-videos-stories.p.rapidapi.com",
-        },
+        headers={"x-rapidapi-key": RAPIDAPI_KEY, "x-rapidapi-host": host},
         timeout=30,
     )
     r.raise_for_status()
     data = r.json()
-    video_url = data.get("media") or data.get("url") or data.get("video_url")
-    if not video_url:
-        raise ValueError(f"RapidAPI não retornou URL de vídeo: {data}")
+    media = data.get("media", [])
+    videos = [m for m in media if m.get("type") == "video"]
+    if not videos:
+        raise ValueError(f"RapidAPI não retornou vídeo: {data}")
+    video_url = videos[0]["url"]
     filepath = os.path.join(tmpdir, "video.mp4")
     with httpx.stream("GET", video_url, timeout=60, follow_redirects=True) as resp:
         resp.raise_for_status()
