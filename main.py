@@ -108,6 +108,29 @@ def download_instagram_instaloader(url: str, tmpdir: str) -> tuple[str, str, str
     return tmpdir, filepath, "mp4"
 
 
+def download_tiktok_tikwm(url: str, tmpdir: str) -> tuple[str, str, str]:
+    r = httpx.post(
+        "https://www.tikwm.com/api/",
+        data={"url": url, "hd": "1"},
+        headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"},
+        timeout=20,
+    )
+    r.raise_for_status()
+    data = r.json()
+    if data.get("code") != 0:
+        raise ValueError(f"tikwm: {data.get('msg', 'erro desconhecido')}")
+    video_url = data["data"].get("play") or data["data"].get("wmplay")
+    if not video_url:
+        raise ValueError("tikwm não retornou URL de vídeo")
+    filepath = os.path.join(tmpdir, "video.mp4")
+    with httpx.stream("GET", video_url, timeout=60, follow_redirects=True) as resp:
+        resp.raise_for_status()
+        with open(filepath, "wb") as f:
+            for chunk in resp.iter_bytes(65536):
+                f.write(chunk)
+    return tmpdir, filepath, "mp4"
+
+
 def download_instagram_rapidapi(url: str, tmpdir: str) -> tuple[str, str, str]:
     if not RAPIDAPI_KEY:
         raise ValueError("RAPIDAPI_KEY não configurada")
@@ -352,14 +375,22 @@ def download_video(url: str) -> tuple[str, str, str]:
             logging.warning("Instaloader falhou (%s) — tentando yt-dlp", e)
             shutil.rmtree(tmpdir, ignore_errors=True)
 
-    # TikTok, YouTube e fallback Instagram via yt-dlp
+    # TikTok: tikwm → yt-dlp fallback
+    if "tiktok.com" in url:
+        tmpdir = tempfile.mkdtemp()
+        try:
+            return download_tiktok_tikwm(url, tmpdir)
+        except Exception as e:
+            logging.warning("tikwm falhou (%s) — tentando yt-dlp", e)
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    # YouTube e fallback via yt-dlp
     tmpdir = tempfile.mkdtemp()
     ydl_opts = {
         "format": "best[ext=mp4]/best",
         "quiet": True,
         "no_warnings": True,
         "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
-        "extractor_args": {"instagram": {"include_feed_data": ["0"]}},
     }
     cookies_file = get_cookies_file()
     if cookies_file:
