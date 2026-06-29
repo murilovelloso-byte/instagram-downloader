@@ -33,6 +33,24 @@ SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "noreply@baixaragora.com.br")
 APP_URL = os.getenv("APP_URL", "https://app.baixaragora.com.br")
 
 KIWIFY_TOKEN = os.getenv("KIWIFY_TOKEN", "")
+INSTAGRAM_COOKIES = os.getenv("INSTAGRAM_COOKIES", "")
+
+_cookies_file: str | None = None
+
+
+def get_cookies_file() -> str | None:
+    global _cookies_file
+    if not INSTAGRAM_COOKIES:
+        return None
+    if _cookies_file and os.path.exists(_cookies_file):
+        return _cookies_file
+    fd, path = tempfile.mkstemp(suffix=".txt", prefix="ig_cookies_")
+    with os.fdopen(fd, "w") as f:
+        f.write(INSTAGRAM_COOKIES)
+    _cookies_file = path
+    logging.info("Cookies do Instagram gravados em %s", path)
+    return path
+
 
 SUPPORTED_URL_PATTERN = re.compile(
     r"https?://("
@@ -238,6 +256,9 @@ def download_video(url: str) -> tuple[str, str, str]:
         "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
         "extractor_args": {"instagram": {"include_feed_data": ["0"]}},
     }
+    cookies_file = get_cookies_file()
+    if cookies_file:
+        ydl_opts["cookiefile"] = cookies_file
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         ext = info.get("ext", "mp4")
