@@ -858,6 +858,17 @@ async def debug_yt_test():
             result["cdn_domain"] = video_url.split("/")[2] if video_url else None
             head_resp = httpx.head(video_url, timeout=10, follow_redirects=True)
             result["cdn_head_status"] = head_resp.status_code
+            # Testar download dos primeiros 64KB
+            try:
+                with httpx.stream("GET", video_url, timeout=15, follow_redirects=True, headers={"Range": "bytes=0-65535"}) as s:
+                    result["cdn_get_status"] = s.status_code
+                    chunk = b""
+                    for c in s.iter_bytes(65536):
+                        chunk = c
+                        break
+                    result["cdn_bytes_received"] = len(chunk)
+            except Exception as e2:
+                result["cdn_get_error"] = str(e2)
     except Exception as e:
         result["error"] = str(e)
         result["traceback"] = traceback.format_exc()
