@@ -403,7 +403,7 @@ def download_video(url: str) -> tuple[str, str, str]:
     # YouTube e fallback via yt-dlp
     tmpdir = tempfile.mkdtemp()
     ydl_opts = {
-        "format": "best[ext=mp4]/best",
+        "format": "best[ext=mp4]/best[ext=webm]/best",
         "quiet": True,
         "no_warnings": True,
         "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
@@ -752,9 +752,10 @@ async def download(
             finally:
                 shutil.rmtree(tmpdir, ignore_errors=True)
 
+        media_type = "video/webm" if ext == "webm" else "video/mp4"
         return StreamingResponse(
             stream(),
-            media_type="video/mp4",
+            media_type=media_type,
             headers={"Content-Disposition": f'attachment; filename="video.{ext}"'},
         )
     except yt_dlp.utils.DownloadError as e:
