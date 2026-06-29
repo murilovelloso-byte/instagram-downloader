@@ -420,8 +420,8 @@ def download_video(url: str) -> tuple[str, str, str]:
         "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
     }
     if is_youtube:
-        # iOS player bypasses bot detection on datacenter IPs
-        ydl_opts["extractor_args"] = {"youtube": {"player_client": ["ios"]}}
+        # android client uses InnerTube API, less aggressive bot detection than web/ios
+        ydl_opts["extractor_args"] = {"youtube": {"player_client": ["android"]}}
         if yt_cookies:
             ydl_opts["cookiefile"] = yt_cookies
     elif ig_cookies:
