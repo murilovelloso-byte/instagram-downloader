@@ -409,19 +409,24 @@ def download_video(url: str) -> tuple[str, str, str]:
 
     # YouTube e fallback via yt-dlp
     tmpdir = tempfile.mkdtemp()
+    is_youtube = "youtube.com" in url or "youtu.be" in url
+    yt_cookies = get_youtube_cookies_file()
+    ig_cookies = get_cookies_file()
+
     ydl_opts = {
         "format": "22/18/mp4",
         "quiet": True,
         "no_warnings": True,
         "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
     }
-    yt_cookies = get_youtube_cookies_file()
-    ig_cookies = get_cookies_file()
-    is_youtube = "youtube.com" in url or "youtu.be" in url
-    if yt_cookies and is_youtube:
-        ydl_opts["cookiefile"] = yt_cookies
-    elif ig_cookies and not is_youtube:
+    if is_youtube:
+        # iOS player bypasses bot detection on datacenter IPs
+        ydl_opts["extractor_args"] = {"youtube": {"player_client": ["ios"]}}
+        if yt_cookies:
+            ydl_opts["cookiefile"] = yt_cookies
+    elif ig_cookies:
         ydl_opts["cookiefile"] = ig_cookies
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         ext = info.get("ext", "mp4")
