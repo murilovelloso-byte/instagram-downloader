@@ -34,8 +34,11 @@ APP_URL = os.getenv("APP_URL", "https://app.baixaragora.com.br")
 
 KIWIFY_TOKEN = os.getenv("KIWIFY_TOKEN", "")
 INSTAGRAM_COOKIES = os.getenv("INSTAGRAM_COOKIES", "")
+INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME", "")
+INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD", "")
 
 _cookies_file: str | None = None
+_instaloader = None
 
 
 def get_cookies_file() -> str | None:
@@ -50,6 +53,58 @@ def get_cookies_file() -> str | None:
     _cookies_file = path
     logging.info("Cookies do Instagram gravados em %s", path)
     return path
+
+
+def get_instaloader():
+    global _instaloader
+    if _instaloader is not None:
+        return _instaloader
+    import instaloader
+    L = instaloader.Instaloader(
+        download_videos=False,
+        download_video_thumbnails=False,
+        download_geotags=False,
+        download_comments=False,
+        save_metadata=False,
+        post_metadata_txt_pattern="",
+        quiet=True,
+    )
+    if INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD:
+        try:
+            L.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+            logging.info("Instaloader: logado como %s", INSTAGRAM_USERNAME)
+        except Exception as e:
+            logging.warning("Instaloader: falha no login: %s", e)
+    _instaloader = L
+    return L
+
+
+def _extract_ig_shortcode(url: str) -> str | None:
+    m = re.search(r"instagram\.com/(?:p|reel|tv)/([A-Za-z0-9_-]+)", url)
+    return m.group(1) if m else None
+
+
+def download_instagram_instaloader(url: str, tmpdir: str) -> tuple[str, str, str]:
+    import instaloader
+    shortcode = _extract_ig_shortcode(url)
+    if not shortcode:
+        raise ValueError("URL do Instagram inválida")
+    L = get_instaloader()
+    post = instaloader.Post.from_shortcode(L.context, shortcode)
+    if not post.is_video:
+        raise HTTPException(status_code=400, detail="Este post não contém vídeo.")
+    video_url = post.video_url
+    headers = {
+        "User-Agent": "Instagram 319.0.0.0.41 Android",
+        "Referer": "https://www.instagram.com/",
+    }
+    filepath = os.path.join(tmpdir, "video.mp4")
+    with httpx.stream("GET", video_url, headers=headers, timeout=60, follow_redirects=True) as r:
+        r.raise_for_status()
+        with open(filepath, "wb") as f:
+            for chunk in r.iter_bytes(65536):
+                f.write(chunk)
+    return tmpdir, filepath, "mp4"
 
 
 SUPPORTED_URL_PATTERN = re.compile(
@@ -248,6 +303,19 @@ def is_valid_url(url: str) -> bool:
 
 def download_video(url: str) -> tuple[str, str, str]:
     """Download video to temp dir. Returns (tmpdir, filepath, ext)."""
+    # Instagram: tenta instaloader primeiro (usa conta bot se configurada)
+    if "instagram.com" in url and _extract_ig_shortcode(url):
+        tmpdir = tempfile.mkdtemp()
+        try:
+            return download_instagram_instaloader(url, tmpdir)
+        except HTTPException:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+            raise
+        except Exception as e:
+            logging.warning("Instaloader falhou (%s) — tentando yt-dlp", e)
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    # TikTok, YouTube e fallback Instagram via yt-dlp
     tmpdir = tempfile.mkdtemp()
     ydl_opts = {
         "format": "best[ext=mp4]/best",
