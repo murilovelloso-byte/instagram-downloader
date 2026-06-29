@@ -38,6 +38,7 @@ INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME", "")
 INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD", "")
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "")
 YOUTUBE_COOKIES = os.getenv("YOUTUBE_COOKIES", "")
+YOUTUBE_COOKIES_B64 = os.getenv("YOUTUBE_COOKIES_B64", "")
 
 _cookies_file: str | None = None
 _yt_cookies_file: str | None = None
@@ -60,13 +61,19 @@ def get_cookies_file() -> str | None:
 
 def get_youtube_cookies_file() -> str | None:
     global _yt_cookies_file
-    if not YOUTUBE_COOKIES:
-        return None
     if _yt_cookies_file and os.path.exists(_yt_cookies_file):
         return _yt_cookies_file
+    content = ""
+    if YOUTUBE_COOKIES_B64:
+        import base64
+        content = base64.b64decode(YOUTUBE_COOKIES_B64).decode("utf-8")
+    elif YOUTUBE_COOKIES:
+        content = YOUTUBE_COOKIES
+    if not content:
+        return None
     fd, path = tempfile.mkstemp(suffix=".txt", prefix="yt_cookies_")
     with os.fdopen(fd, "w") as f:
-        f.write(YOUTUBE_COOKIES)
+        f.write(content)
     _yt_cookies_file = path
     logging.info("Cookies do YouTube gravados em %s", path)
     return path
