@@ -1,6 +1,6 @@
 fastapi==0.115.12
 uvicorn[standard]==0.34.0
-yt-dlp
+yt-dlp==2025.6.9
 httpx==0.28.1
 pydantic[email]
 psycopg2-binary==2.9.10
