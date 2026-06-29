@@ -403,7 +403,7 @@ def download_video(url: str) -> tuple[str, str, str]:
     # YouTube e fallback via yt-dlp
     tmpdir = tempfile.mkdtemp()
     ydl_opts = {
-        "format": "b",
+        "format": "best[vcodec!=none][acodec!=none][ext=mp4]/best[vcodec!=none][acodec!=none]/worst[vcodec!=none][acodec!=none]",
         "quiet": True,
         "no_warnings": True,
         "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
