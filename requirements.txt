@@ -5,4 +5,3 @@ httpx==0.28.1
 pydantic[email]
 psycopg2-binary==2.9.10
 aiofiles==24.1.0
-instaloader==4.13.1

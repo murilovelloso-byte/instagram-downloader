@@ -6,6 +6,7 @@ import random
 import secrets
 import uuid as uuid_lib
 import logging
+import asyncio
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse, unquote
 
@@ -34,16 +35,16 @@ APP_URL = os.getenv("APP_URL", "https://app.baixaragora.com.br")
 
 KIWIFY_TOKEN = os.getenv("KIWIFY_TOKEN", "")
 INSTAGRAM_COOKIES = os.getenv("INSTAGRAM_COOKIES", "")
-INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME", "")
-INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD", "")
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "")
 RAPIDAPI_YOUTUBE_HOST = os.getenv("RAPIDAPI_YOUTUBE_HOST", "")
 YOUTUBE_COOKIES = os.getenv("YOUTUBE_COOKIES", "")
 YOUTUBE_COOKIES_B64 = os.getenv("YOUTUBE_COOKIES_B64", "")
+ALERT_EMAIL = os.getenv("ALERT_EMAIL", "murilovelloso@gmail.com")
+IG_HEALTHCHECK_URL = os.getenv("IG_HEALTHCHECK_URL", "https://www.instagram.com/reel/Dalx4AFzeWG/")
+IG_HEALTHCHECK_INTERVAL_HOURS = float(os.getenv("IG_HEALTHCHECK_INTERVAL_HOURS", "4"))
 
 _cookies_file: str | None = None
 _yt_cookies_file: str | None = None
-_instaloader = None
 
 
 def get_cookies_file() -> str | None:
@@ -80,56 +81,32 @@ def get_youtube_cookies_file() -> str | None:
     return path
 
 
-def get_instaloader():
-    global _instaloader
-    if _instaloader is not None:
-        return _instaloader
-    import instaloader
-    L = instaloader.Instaloader(
-        download_videos=False,
-        download_video_thumbnails=False,
-        download_geotags=False,
-        download_comments=False,
-        save_metadata=False,
-        post_metadata_txt_pattern="",
-        quiet=True,
-    )
-    if INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD:
-        try:
-            L.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
-            logging.info("Instaloader: logado como %s", INSTAGRAM_USERNAME)
-        except Exception as e:
-            logging.warning("Instaloader: falha no login: %s", e)
-    _instaloader = L
-    return L
-
-
 def _extract_ig_shortcode(url: str) -> str | None:
     m = re.search(r"instagram\.com/(?:p|reel|tv)/([A-Za-z0-9_-]+)", url)
     return m.group(1) if m else None
 
 
-def download_instagram_instaloader(url: str, tmpdir: str) -> tuple[str, str, str]:
-    import instaloader
-    shortcode = _extract_ig_shortcode(url)
-    if not shortcode:
-        raise ValueError("URL do Instagram inválida")
-    L = get_instaloader()
-    post = instaloader.Post.from_shortcode(L.context, shortcode)
-    if not post.is_video:
-        raise HTTPException(status_code=400, detail="Este post não contém vídeo.")
-    video_url = post.video_url
-    headers = {
-        "User-Agent": "Instagram 319.0.0.0.41 Android",
-        "Referer": "https://www.instagram.com/",
+def download_via_ytdlp(
+    url: str,
+    tmpdir: str,
+    cookiefile: str | None = None,
+    extractor_args: dict | None = None,
+) -> tuple[str, str, str]:
+    ydl_opts = {
+        "format": "22/18/mp4",
+        "quiet": True,
+        "no_warnings": True,
+        "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
     }
-    filepath = os.path.join(tmpdir, "video.mp4")
-    with httpx.stream("GET", video_url, headers=headers, timeout=60, follow_redirects=True) as r:
-        r.raise_for_status()
-        with open(filepath, "wb") as f:
-            for chunk in r.iter_bytes(65536):
-                f.write(chunk)
-    return tmpdir, filepath, "mp4"
+    if extractor_args:
+        ydl_opts["extractor_args"] = extractor_args
+    if cookiefile:
+        ydl_opts["cookiefile"] = cookiefile
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        ext = info.get("ext", "mp4")
+    filepath = os.path.join(tmpdir, f"video.{ext}")
+    return tmpdir, filepath, ext
 
 
 def download_tiktok_tikwm(url: str, tmpdir: str) -> tuple[str, str, str]:
@@ -414,27 +391,25 @@ def download_youtube_rapidapi(url: str, tmpdir: str) -> tuple[str, str, str]:
 
 def download_video(url: str) -> tuple[str, str, str]:
     """Download video to temp dir. Returns (tmpdir, filepath, ext)."""
-    # Instagram: tenta RapidAPI → instaloader → yt-dlp
+    # Instagram: tenta yt-dlp+cookies (rápido e confiável) → RapidAPI (reserva paga, cota limitada)
     if "instagram.com" in url and _extract_ig_shortcode(url):
         tmpdir = tempfile.mkdtemp()
+        ig_cookies = get_cookies_file()
+        if ig_cookies:
+            try:
+                return download_via_ytdlp(url, tmpdir, cookiefile=ig_cookies)
+            except Exception as e:
+                logging.warning("yt-dlp com cookies falhou (%s) — tentando RapidAPI", e)
+                shutil.rmtree(tmpdir, ignore_errors=True)
+                tmpdir = tempfile.mkdtemp()
         if RAPIDAPI_KEY:
             try:
                 return download_instagram_rapidapi(url, tmpdir)
-            except HTTPException:
-                shutil.rmtree(tmpdir, ignore_errors=True)
-                raise
             except Exception as e:
-                logging.warning("RapidAPI falhou (%s) — tentando instaloader", e)
                 shutil.rmtree(tmpdir, ignore_errors=True)
-                tmpdir = tempfile.mkdtemp()
-        try:
-            return download_instagram_instaloader(url, tmpdir)
-        except HTTPException:
-            shutil.rmtree(tmpdir, ignore_errors=True)
-            raise
-        except Exception as e:
-            logging.warning("Instaloader falhou (%s) — tentando yt-dlp", e)
-            shutil.rmtree(tmpdir, ignore_errors=True)
+                raise HTTPException(status_code=422, detail=f"Não foi possível baixar o vídeo do Instagram: {e}")
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        raise HTTPException(status_code=422, detail="Não foi possível baixar o vídeo do Instagram: nenhum método de extração disponível.")
 
     # TikTok: tikwm → yt-dlp fallback
     if "tiktok.com" in url:
@@ -455,35 +430,71 @@ def download_video(url: str) -> tuple[str, str, str]:
             logging.warning("RapidAPI YouTube falhou (%s) — tentando yt-dlp", e)
             shutil.rmtree(tmpdir, ignore_errors=True)
 
-    # yt-dlp fallback
+    # yt-dlp fallback (YouTube e TikTok)
     tmpdir = tempfile.mkdtemp()
-    yt_cookies = get_youtube_cookies_file()
-    ig_cookies = get_cookies_file()
-
-    ydl_opts = {
-        "format": "22/18/mp4",
-        "quiet": True,
-        "no_warnings": True,
-        "outtmpl": os.path.join(tmpdir, "video.%(ext)s"),
-    }
     if is_youtube:
         # android client uses InnerTube API, less aggressive bot detection than web/ios
-        ydl_opts["extractor_args"] = {"youtube": {"player_client": ["android"]}}
-        if yt_cookies:
-            ydl_opts["cookiefile"] = yt_cookies
-    elif ig_cookies:
-        ydl_opts["cookiefile"] = ig_cookies
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        ext = info.get("ext", "mp4")
-    filepath = os.path.join(tmpdir, f"video.{ext}")
-    return tmpdir, filepath, ext
+        return download_via_ytdlp(
+            url, tmpdir,
+            cookiefile=get_youtube_cookies_file(),
+            extractor_args={"youtube": {"player_client": ["android"]}},
+        )
+    return download_via_ytdlp(url, tmpdir)
 
 
 def require_admin(x_admin_key: str = Header(None)):
     if not ADMIN_KEY or x_admin_key != ADMIN_KEY:
         raise HTTPException(status_code=403, detail="Acesso negado.")
+
+
+# --- Monitoramento de saúde do Instagram ---
+
+_ig_consecutive_failures = 0
+
+
+def check_instagram_health() -> tuple[bool, str]:
+    """Testa se o método principal de download do Instagram (yt-dlp + cookies) ainda funciona."""
+    ydl_opts = {"quiet": True, "no_warnings": True}
+    ig_cookies = get_cookies_file()
+    if ig_cookies:
+        ydl_opts["cookiefile"] = ig_cookies
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.extract_info(IG_HEALTHCHECK_URL, download=False)
+        return True, "ok"
+    except Exception as e:
+        return False, str(e)
+
+
+async def _instagram_healthcheck_loop():
+    global _ig_consecutive_failures
+    while True:
+        await asyncio.sleep(IG_HEALTHCHECK_INTERVAL_HOURS * 3600)
+        ok, detail = await asyncio.to_thread(check_instagram_health)
+        if ok:
+            if _ig_consecutive_failures > 0:
+                logging.info("Instagram healthcheck: recuperado após %d falha(s)", _ig_consecutive_failures)
+            _ig_consecutive_failures = 0
+            continue
+        _ig_consecutive_failures += 1
+        logging.warning("Instagram healthcheck falhou (%d/2): %s", _ig_consecutive_failures, detail)
+        if _ig_consecutive_failures == 2 and ALERT_EMAIL:
+            try:
+                send_email(
+                    ALERT_EMAIL,
+                    "⚠️ Baixar Agora: downloads do Instagram falhando",
+                    f"<p>O healthcheck detectou 2 falhas seguidas ao baixar do Instagram.</p>"
+                    f"<p>Erro: {detail}</p>"
+                    f"<p>Provavelmente os cookies do Instagram expiraram ou a conta levou checkpoint. "
+                    f"Exporte cookies novos e atualize a variável INSTAGRAM_COOKIES no Render.</p>",
+                )
+            except Exception as e:
+                logging.error("Falha ao enviar e-mail de alerta do healthcheck: %s", e)
+
+
+@app.on_event("startup")
+async def _start_instagram_healthcheck():
+    asyncio.create_task(_instagram_healthcheck_loop())
 
 
 # --- HTML ---
@@ -915,6 +926,13 @@ async def reativar_comprador(email: str, x_admin_key: str = Header(None)):
     email = email.lower().strip()
     db_execute("UPDATE compradores SET ativo = 1 WHERE email = %s", (email,))
     return {"ok": True, "email": email}
+
+
+@app.get("/admin/instagram-check")
+async def admin_instagram_check(x_admin_key: str = Header(None)):
+    require_admin(x_admin_key)
+    ok, detail = await asyncio.to_thread(check_instagram_health)
+    return {"ok": ok, "detail": detail}
 
 
 @app.get("/admin/stats/crescimento")
