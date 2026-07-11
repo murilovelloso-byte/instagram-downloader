@@ -41,7 +41,8 @@ YOUTUBE_COOKIES = os.getenv("YOUTUBE_COOKIES", "")
 YOUTUBE_COOKIES_B64 = os.getenv("YOUTUBE_COOKIES_B64", "")
 ALERT_EMAIL = os.getenv("ALERT_EMAIL", "murilovelloso@gmail.com")
 IG_HEALTHCHECK_URL = os.getenv("IG_HEALTHCHECK_URL", "https://www.instagram.com/reel/Dalx4AFzeWG/")
-IG_HEALTHCHECK_INTERVAL_HOURS = float(os.getenv("IG_HEALTHCHECK_INTERVAL_HOURS", "4"))
+IG_HEALTHCHECK_INTERVAL_HOURS = float(os.getenv("IG_HEALTHCHECK_INTERVAL_HOURS", "1"))
+IG_COOKIE_EXPIRY_WARNING_DAYS = int(os.getenv("IG_COOKIE_EXPIRY_WARNING_DAYS", "20"))
 
 _cookies_file: str | None = None
 _yt_cookies_file: str | None = None
@@ -450,6 +451,7 @@ def require_admin(x_admin_key: str = Header(None)):
 # --- Monitoramento de saúde do Instagram ---
 
 _ig_consecutive_failures = 0
+_ig_expiry_warned = False
 
 
 def check_instagram_health() -> tuple[bool, str]:
@@ -466,10 +468,51 @@ def check_instagram_health() -> tuple[bool, str]:
         return False, str(e)
 
 
+def check_cookie_days_left() -> int | None:
+    """Menor número de dias até algum cookie de autenticação do Instagram vencer (None se não der pra calcular)."""
+    if not INSTAGRAM_COOKIES:
+        return None
+    min_ts = None
+    for line in INSTAGRAM_COOKIES.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) < 7 or "instagram.com" not in parts[0]:
+            continue
+        try:
+            ts = int(parts[4])
+        except ValueError:
+            continue
+        if ts <= 0:  # 0 = cookie de sessão, sem data fixa
+            continue
+        if min_ts is None or ts < min_ts:
+            min_ts = ts
+    if min_ts is None:
+        return None
+    return int((min_ts - datetime.now(timezone.utc).timestamp()) / 86400)
+
+
 async def _instagram_healthcheck_loop():
-    global _ig_consecutive_failures
+    global _ig_consecutive_failures, _ig_expiry_warned
     while True:
         await asyncio.sleep(IG_HEALTHCHECK_INTERVAL_HOURS * 3600)
+
+        days_left = check_cookie_days_left()
+        if days_left is not None and days_left <= IG_COOKIE_EXPIRY_WARNING_DAYS and not _ig_expiry_warned:
+            _ig_expiry_warned = True
+            try:
+                send_email(
+                    ALERT_EMAIL,
+                    "⏰ Baixar Agora: cookies do Instagram vencendo em breve",
+                    f"<p>Os cookies do Instagram configurados no Render vencem em aproximadamente "
+                    f"<strong>{days_left} dia(s)</strong>.</p>"
+                    f"<p>Exporte cookies novos do navegador (conta baixaragora10 ou outra dedicada) e "
+                    f"atualize a variável INSTAGRAM_COOKIES no Render antes do vencimento.</p>",
+                )
+            except Exception as e:
+                logging.error("Falha ao enviar e-mail de aviso de vencimento de cookie: %s", e)
+
         ok, detail = await asyncio.to_thread(check_instagram_health)
         if ok:
             if _ig_consecutive_failures > 0:
@@ -932,7 +975,7 @@ async def reativar_comprador(email: str, x_admin_key: str = Header(None)):
 async def admin_instagram_check(x_admin_key: str = Header(None)):
     require_admin(x_admin_key)
     ok, detail = await asyncio.to_thread(check_instagram_health)
-    return {"ok": ok, "detail": detail}
+    return {"ok": ok, "detail": detail, "cookie_days_left": check_cookie_days_left()}
 
 
 @app.get("/admin/stats/crescimento")
