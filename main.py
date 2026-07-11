@@ -468,6 +468,9 @@ def check_instagram_health() -> tuple[bool, str]:
         return False, str(e)
 
 
+_IG_AUTH_COOKIE_NAMES = {"sessionid", "csrftoken", "ds_user_id"}
+
+
 def check_cookie_days_left() -> int | None:
     """Menor número de dias até algum cookie de autenticação do Instagram vencer (None se não der pra calcular)."""
     if not INSTAGRAM_COOKIES:
@@ -478,7 +481,7 @@ def check_cookie_days_left() -> int | None:
         if not line or line.startswith("#"):
             continue
         parts = line.split("\t")
-        if len(parts) < 7 or "instagram.com" not in parts[0]:
+        if len(parts) < 7 or "instagram.com" not in parts[0] or parts[5] not in _IG_AUTH_COOKIE_NAMES:
             continue
         try:
             ts = int(parts[4])
