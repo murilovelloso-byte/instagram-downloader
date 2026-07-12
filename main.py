@@ -39,7 +39,7 @@ RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY", "")
 RAPIDAPI_YOUTUBE_HOST = os.getenv("RAPIDAPI_YOUTUBE_HOST", "")
 YOUTUBE_COOKIES = os.getenv("YOUTUBE_COOKIES", "")
 YOUTUBE_COOKIES_B64 = os.getenv("YOUTUBE_COOKIES_B64", "")
-ALERT_EMAIL = os.getenv("ALERT_EMAIL", "murilovelloso@gmail.com")
+ALERT_EMAIL = os.getenv("ALERT_EMAIL", "murilovelloso@gmail.com,glaucia.marques360@gmail.com")
 IG_HEALTHCHECK_URL = os.getenv("IG_HEALTHCHECK_URL", "https://www.instagram.com/reel/Dalx4AFzeWG/")
 IG_HEALTHCHECK_INTERVAL_HOURS = float(os.getenv("IG_HEALTHCHECK_INTERVAL_HOURS", "4"))
 IG_COOKIE_EXPIRY_WARNING_DAYS = int(os.getenv("IG_COOKIE_EXPIRY_WARNING_DAYS", "20"))
@@ -496,6 +496,14 @@ def check_cookie_days_left() -> int | None:
     return int((min_ts - datetime.now(timezone.utc).timestamp()) / 86400)
 
 
+def send_alert_emails(subject: str, html_body: str):
+    for email in [e.strip() for e in ALERT_EMAIL.split(",") if e.strip()]:
+        try:
+            send_email(email, subject, html_body)
+        except Exception as e:
+            logging.error("Falha ao enviar e-mail de alerta para %s: %s", email, e)
+
+
 async def _instagram_healthcheck_loop():
     global _ig_consecutive_failures, _ig_expiry_warned
     while True:
@@ -504,17 +512,13 @@ async def _instagram_healthcheck_loop():
         days_left = check_cookie_days_left()
         if days_left is not None and days_left <= IG_COOKIE_EXPIRY_WARNING_DAYS and not _ig_expiry_warned:
             _ig_expiry_warned = True
-            try:
-                send_email(
-                    ALERT_EMAIL,
-                    "⏰ Baixar Agora: cookies do Instagram vencendo em breve",
-                    f"<p>Os cookies do Instagram configurados no Render vencem em aproximadamente "
-                    f"<strong>{days_left} dia(s)</strong>.</p>"
-                    f"<p>Exporte cookies novos do navegador (conta baixaragora10 ou outra dedicada) e "
-                    f"atualize a variável INSTAGRAM_COOKIES no Render antes do vencimento.</p>",
-                )
-            except Exception as e:
-                logging.error("Falha ao enviar e-mail de aviso de vencimento de cookie: %s", e)
+            send_alert_emails(
+                "⏰ Baixar Agora: cookies do Instagram vencendo em breve",
+                f"<p>Os cookies do Instagram configurados no Render vencem em aproximadamente "
+                f"<strong>{days_left} dia(s)</strong>.</p>"
+                f"<p>Exporte cookies novos do navegador (conta baixaragora10 ou outra dedicada) e "
+                f"atualize a variável INSTAGRAM_COOKIES no Render antes do vencimento.</p>",
+            )
 
         ok, detail = await asyncio.to_thread(check_instagram_health)
         if ok:
@@ -525,17 +529,13 @@ async def _instagram_healthcheck_loop():
         _ig_consecutive_failures += 1
         logging.warning("Instagram healthcheck falhou (%d/2): %s", _ig_consecutive_failures, detail)
         if _ig_consecutive_failures == 2 and ALERT_EMAIL:
-            try:
-                send_email(
-                    ALERT_EMAIL,
-                    "⚠️ Baixar Agora: downloads do Instagram falhando",
-                    f"<p>O healthcheck detectou 2 falhas seguidas ao baixar do Instagram.</p>"
-                    f"<p>Erro: {detail}</p>"
-                    f"<p>Provavelmente os cookies do Instagram expiraram ou a conta levou checkpoint. "
-                    f"Exporte cookies novos e atualize a variável INSTAGRAM_COOKIES no Render.</p>",
-                )
-            except Exception as e:
-                logging.error("Falha ao enviar e-mail de alerta do healthcheck: %s", e)
+            send_alert_emails(
+                "⚠️ Baixar Agora: downloads do Instagram falhando",
+                f"<p>O healthcheck detectou 2 falhas seguidas ao baixar do Instagram.</p>"
+                f"<p>Erro: {detail}</p>"
+                f"<p>Provavelmente os cookies do Instagram expiraram ou a conta levou checkpoint. "
+                f"Exporte cookies novos e atualize a variável INSTAGRAM_COOKIES no Render.</p>",
+            )
 
 
 @app.on_event("startup")
