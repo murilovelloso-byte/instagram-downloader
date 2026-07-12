@@ -41,7 +41,7 @@ YOUTUBE_COOKIES = os.getenv("YOUTUBE_COOKIES", "")
 YOUTUBE_COOKIES_B64 = os.getenv("YOUTUBE_COOKIES_B64", "")
 ALERT_EMAIL = os.getenv("ALERT_EMAIL", "murilovelloso@gmail.com")
 IG_HEALTHCHECK_URL = os.getenv("IG_HEALTHCHECK_URL", "https://www.instagram.com/reel/Dalx4AFzeWG/")
-IG_HEALTHCHECK_INTERVAL_HOURS = float(os.getenv("IG_HEALTHCHECK_INTERVAL_HOURS", "1"))
+IG_HEALTHCHECK_INTERVAL_HOURS = float(os.getenv("IG_HEALTHCHECK_INTERVAL_HOURS", "4"))
 IG_COOKIE_EXPIRY_WARNING_DAYS = int(os.getenv("IG_COOKIE_EXPIRY_WARNING_DAYS", "20"))
 
 _cookies_file: str | None = None
