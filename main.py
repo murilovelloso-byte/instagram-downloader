@@ -197,6 +197,9 @@ def db_fetchone(query: str, params: tuple = ()):
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(query, params)
             return cur.fetchone()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         pool.putconn(conn)
 
@@ -208,6 +211,9 @@ def db_fetchall(query: str, params: tuple = ()):
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(query, params)
             return cur.fetchall()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         pool.putconn(conn)
 
@@ -219,6 +225,9 @@ def db_execute(query: str, params: tuple = ()):
         with conn.cursor() as cur:
             cur.execute(query, params)
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         pool.putconn(conn)
 
