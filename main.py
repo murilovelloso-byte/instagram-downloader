@@ -464,17 +464,21 @@ _ig_expiry_warned = False
 
 
 def check_instagram_health() -> tuple[bool, str]:
-    """Testa se o método principal de download do Instagram (yt-dlp + cookies) ainda funciona."""
-    ydl_opts = {"quiet": True, "no_warnings": True}
-    ig_cookies = get_cookies_file()
-    if ig_cookies:
-        ydl_opts["cookiefile"] = ig_cookies
+    """Testa o fluxo real de download do Instagram, incluindo o fallback para RapidAPI.
+
+    Antes testava só yt-dlp+cookies isolado, que fica sujeito a bot detection do
+    Instagram mesmo com o RapidAPI funcionando normal como reserva — gerando alertas
+    de falha mesmo quando os clientes conseguem baixar normalmente pelo fallback.
+    """
+    tmpdir = None
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.extract_info(IG_HEALTHCHECK_URL, download=False)
+        tmpdir, _filepath, _ext = download_video(IG_HEALTHCHECK_URL)
         return True, "ok"
     except Exception as e:
         return False, str(e)
+    finally:
+        if tmpdir:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 _IG_AUTH_COOKIE_NAMES = {"sessionid", "csrftoken", "ds_user_id"}
