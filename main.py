@@ -477,6 +477,16 @@ def require_admin(x_admin_key: str = Header(None)):
 
 _ig_consecutive_failures = 0
 _ig_expiry_warned = False
+_db_consecutive_failures = 0
+
+
+def check_database_health() -> tuple[bool, str]:
+    """Testa se o pool de conexões com o Supabase está respondendo."""
+    try:
+        db_fetchone("SELECT 1")
+        return True, "ok"
+    except Exception as e:
+        return False, str(e)
 
 
 def check_instagram_health() -> tuple[bool, str]:
@@ -534,9 +544,25 @@ def send_alert_emails(subject: str, html_body: str):
 
 
 async def _instagram_healthcheck_loop():
-    global _ig_consecutive_failures, _ig_expiry_warned
+    global _ig_consecutive_failures, _ig_expiry_warned, _db_consecutive_failures
     while True:
         await asyncio.sleep(IG_HEALTHCHECK_INTERVAL_HOURS * 3600)
+
+        db_ok, db_detail = await asyncio.to_thread(check_database_health)
+        if db_ok:
+            if _db_consecutive_failures > 0:
+                logging.info("DB healthcheck: recuperado após %d falha(s)", _db_consecutive_failures)
+            _db_consecutive_failures = 0
+        else:
+            _db_consecutive_failures += 1
+            logging.warning("DB healthcheck falhou (%d/2): %s", _db_consecutive_failures, db_detail)
+            if _db_consecutive_failures == 2 and ALERT_EMAIL:
+                send_alert_emails(
+                    "⚠️ Baixar Agora: banco de dados falhando",
+                    f"<p>O healthcheck detectou 2 falhas seguidas ao consultar o Supabase.</p>"
+                    f"<p>Erro: {db_detail}</p>"
+                    f"<p>Verifique o status do projeto no Supabase e os logs do Render.</p>",
+                )
 
         days_left = check_cookie_days_left()
         if days_left is not None and days_left <= IG_COOKIE_EXPIRY_WARNING_DAYS and not _ig_expiry_warned:
