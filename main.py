@@ -190,9 +190,25 @@ def get_pool():
     return _pool
 
 
+def _get_live_conn(pool, max_attempts=5):
+    """Descarta conexões mortas pelo pooler (idle timeout) antes de usar."""
+    for _ in range(max_attempts):
+        conn = pool.getconn()
+        if conn.closed:
+            pool.putconn(conn, close=True)
+            continue
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+            return conn
+        except psycopg2.Error:
+            pool.putconn(conn, close=True)
+    return pool.getconn()
+
+
 def db_fetchone(query: str, params: tuple = ()):
     pool = get_pool()
-    conn = pool.getconn()
+    conn = _get_live_conn(pool)
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(query, params)
@@ -206,7 +222,7 @@ def db_fetchone(query: str, params: tuple = ()):
 
 def db_fetchall(query: str, params: tuple = ()):
     pool = get_pool()
-    conn = pool.getconn()
+    conn = _get_live_conn(pool)
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(query, params)
@@ -220,7 +236,7 @@ def db_fetchall(query: str, params: tuple = ()):
 
 def db_execute(query: str, params: tuple = ()):
     pool = get_pool()
-    conn = pool.getconn()
+    conn = _get_live_conn(pool)
     try:
         with conn.cursor() as cur:
             cur.execute(query, params)
