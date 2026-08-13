@@ -738,7 +738,7 @@ def build_confirmar_html(chave: str) -> str:
     </div>
   </div>
 
-  <a class="btn-instalar" href="https://www.icloud.com/shortcuts/42e7cdf1c12b4ac7889e2dc0ceaa67a0">Instalar Baixar Agora →</a>
+  <a class="btn-instalar" href="https://www.icloud.com/shortcuts/85e08567899e48bbb4cfc033cdac2043">Instalar Baixar Agora →</a>
 
   <a href="https://player.mediadelivery.net/play/674361/e082ba88-e112-42d5-bf08-9cef4e342417" style="display:block;width:100%;padding:13px;background:#f5f5f7;color:#5e17eb;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;margin-bottom:12px;text-align:center;box-sizing:border-box">▶ Assistir tutorial</a>
 
