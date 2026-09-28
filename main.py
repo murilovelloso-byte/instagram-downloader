@@ -879,6 +879,13 @@ async def confirmar(token: str = Query(...)):
 # --- Download endpoint (now requires chave) ---
 
 
+def normalizar_chave(chave: str) -> str:
+    """As chaves são hex minúsculo (secrets.token_hex), então espaço, quebra de
+    linha e maiúsculas nunca fazem parte de uma chave real. O atalho do iPhone
+    manda o conteúdo cru do chave.txt, que costuma vir com esse tipo de sujeira."""
+    return re.sub(r"[\s\u200b\u200c\u200d\ufeff]", "", chave or "").lower()
+
+
 @app.get("/download")
 async def download(
     url: str = Query(..., description="URL do vídeo (Instagram, YouTube ou TikTok)"),
@@ -886,10 +893,10 @@ async def download(
     device_id: str = Query(None, description="ID único do dispositivo"),
 ):
     row = db_fetchone(
-        """SELECT c.email FROM chaves c
+        """SELECT c.email, c.chave FROM chaves c
            JOIN compradores cp ON c.email = cp.email
-           WHERE c.chave = %s AND cp.ativo = 1""",
-        (chave,),
+           WHERE lower(trim(c.chave)) = %s AND cp.ativo = 1""",
+        (normalizar_chave(chave),),
     )
 
     if not row:
@@ -900,7 +907,7 @@ async def download(
             """INSERT INTO dispositivos (chave, device_id)
                VALUES (%s, %s)
                ON CONFLICT (chave, device_id) DO UPDATE SET ultimo_uso = NOW()""",
-            (chave, device_id),
+            (row["chave"], device_id),
         )
 
     if not is_valid_url(url):
