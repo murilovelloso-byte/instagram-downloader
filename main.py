@@ -886,6 +886,24 @@ def normalizar_chave(chave: str) -> str:
     return re.sub(r"[\s\u200b\u200c\u200d\ufeff]", "", chave or "").lower()
 
 
+def mensagem_chave_invalida(chave: str) -> str:
+    """O erro genérico de chave manda o cliente para o suporte. Quando dá para
+    saber o que ele confundiu, a própria mensagem resolve o problema."""
+    c = normalizar_chave(chave)
+    if re.fullmatch(r"\d{6}", c):
+        return (
+            "Isso é o código de 6 dígitos do e-mail, não a sua chave. "
+            "A chave tem 16 letras e números e aparece na página de ativação, "
+            "no botão 'Ativar meu atalho' do e-mail que você recebeu."
+        )
+    if not c:
+        return (
+            "Nenhuma chave foi enviada. Rode o atalho de novo e digite a chave "
+            "de 16 letras e números da página de ativação."
+        )
+    return "Chave inválida ou acesso revogado."
+
+
 @app.get("/download")
 async def download(
     url: str = Query(..., description="URL do vídeo (Instagram, YouTube ou TikTok)"),
@@ -900,7 +918,7 @@ async def download(
     )
 
     if not row:
-        raise HTTPException(status_code=401, detail="Chave inválida ou acesso revogado.")
+        raise HTTPException(status_code=401, detail=mensagem_chave_invalida(chave))
 
     if device_id:
         db_execute(
@@ -911,6 +929,18 @@ async def download(
         )
 
     if not is_valid_url(url):
+        alvo = normalizar_chave(url)
+        if re.fullmatch(r"[0-9a-f]{16}", alvo) or re.fullmatch(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", alvo
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Você copiou a sua chave, não o link do vídeo. "
+                    "Abra o vídeo no Instagram, toque em Compartilhar → Copiar link "
+                    "e rode o atalho de novo."
+                ),
+            )
         raise HTTPException(
             status_code=400,
             detail="URL inválida. Envie links do Instagram, YouTube ou TikTok.",
